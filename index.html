@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI ツール情報収集・管理システム</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', sans-serif; min-height: 100vh; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  .app { position: relative; z-index: 1; }
+
+  header {
+    border-bottom: 1px solid var(--border); background: rgba(10,14,26,0.97);
+    backdrop-filter: blur(20px); position: sticky; top: 0; z-index: 100; padding: 0 28px;
+  }
+  .header-inner {
+    max-width: 1400px; margin: 0 auto; display: flex;
+    align-items: center; justify-content: space-between; height: 60px; gap: 16px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .logo-label { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 13px; color: var(--accent); }
+  .logo-sub { font-size: 10px; color: var(--text-muted); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  #auth-status { font-size: 11px; color: var(--text-muted); font-family: 'Space Mono', monospace; display: flex; align-items: center; gap: 6px; }
+  .auth-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+  .auth-dot.ok { background: var(--accent3); }
+
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; font-family: 'Noto Sans JP', sans-serif; white-space: nowrap; }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), #0099cc); color: #000; }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 18px rgba(0,212,255,0.3); }
+  .btn-google { background: #fff; color: #333; border: 1px solid #ddd; font-size: 12px; }
+  .btn-google:hover:not(:disabled) { background: #f5f5f5; }
+  .btn-success { background: linear-gradient(135deg, var(--accent3), #059669); color: #fff; }
+  .btn-success:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 18px rgba(16,185,129,0.3); }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .btn-warn { background: rgba(245,158,11,0.15); color: var(--warn); border: 1px solid rgba(245,158,11,0.3); }
+  .btn-warn:hover:not(:disabled) { background: rgba(245,158,11,0.25); }
+  .btn-danger { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.25); }
+  .btn-danger:hover:not(:disabled) { background: rgba(239,68,68,0.2); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 24px 28px; }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin-bottom: 18px; }
+  .panel-title { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px; }
+
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr 160px; gap: 12px; align-items: end; }
+  @media(max-width:700px){ .settings-grid{ grid-template-columns:1fr; } }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field-label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+  .field-hint { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  input[type="text"], input[type="password"] {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; color: var(--text);
+    padding: 8px 12px; font-size: 12px; font-family: 'Space Mono', monospace; outline: none; transition: border-color 0.2s; width: 100%;
+  }
+  input:focus { border-color: var(--accent); }
+
+  .apikey-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; }
+
+  .model-select-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .model-chip { padding: 4px 12px; border-radius: 20px; font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--text-muted); transition: all 0.2s; }
+  .model-chip.active { background: rgba(0,212,255,0.12); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+  .action-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 20px; margin-bottom: 18px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .divider { width: 1px; height: 28px; background: var(--border); }
+  .ml-auto { margin-left: auto; }
+  .last-sync { font-size: 10px; color: var(--text-muted); font-family: 'Space Mono', monospace; }
+
+  .status-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 11px 16px; margin-bottom: 18px; font-family: 'Space Mono', monospace; font-size: 11px; display: flex; flex-direction: column; gap: 6px; }
+  .status-line { display: flex; align-items: center; gap: 8px; }
+  .sdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .sdot.idle { background: var(--text-muted); }
+  .sdot.running { background: var(--accent); animation: blink 1s infinite; }
+  .sdot.done { background: var(--accent3); }
+  .sdot.error { background: var(--danger); }
+  .sdot.sheets { background: var(--accent2); animation: blink 0.8s infinite; }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.3} }
+  .stext { color: var(--text-dim); flex: 1; }
+  .prog-wrap { height: 2px; background: var(--border); border-radius: 1px; overflow: hidden; display: none; }
+  .prog-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 1px; transition: width 0.4s; width: 0%; }
+
+  .stats-row { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; flex: 1; min-width: 110px; }
+  .stat-val { font-size: 26px; font-weight: 900; font-family: 'Space Mono', monospace; color: var(--accent); line-height: 1; }
+  .stat-label { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  select, input[type="search"] { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 11px; font-family: 'Noto Sans JP', sans-serif; outline: none; cursor: pointer; transition: border-color 0.2s; }
+  select:focus, input[type="search"]:focus { border-color: var(--accent); }
+  input[type="search"] { width: 180px; }
+
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .table-header { display: flex; align-items: center; justify-content: space-between; padding: 13px 18px; border-bottom: 1px solid var(--border); gap: 10px; flex-wrap: wrap; }
+  .table-title { font-size: 13px; font-weight: 700; }
+  .table-scroll { overflow-x: auto; max-height: 520px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  thead th { background: var(--surface2); padding: 9px 11px; text-align: left; font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; position: sticky; top: 0; transition: color 0.2s; white-space: nowrap; }
+  thead th:hover { color: var(--accent); }
+  thead th.sorted { color: var(--accent); }
+  tbody tr { border-bottom: 1px solid rgba(30,45,69,0.5); transition: background 0.15s; }
+  tbody tr:hover { background: rgba(0,212,255,0.03); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 9px 11px; color: var(--text-dim); vertical-align: top; max-width: 220px; word-break: break-word; line-height: 1.5; }
+  td.no-col { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+  .tool-name { font-weight: 700; color: var(--text); white-space: nowrap; }
+  .tool-url { color: var(--accent); font-size: 9.5px; opacity: 0.65; text-decoration: none; display: block; margin-top: 2px; }
+  .tool-url:hover { opacity: 1; }
+  .cat-tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 500; white-space: nowrap; }
+  .stars { color: var(--warn); font-size: 11px; white-space: nowrap; }
+  .free-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 9.5px; font-weight: 600; white-space: nowrap; }
+  .free-yes { background: rgba(16,185,129,0.15); color: #34d399; }
+  .free-no  { background: rgba(100,116,139,0.12); color: var(--text-muted); }
+  .empty-row td { text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px; }
+
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+  .toast { padding: 10px 16px; border-radius: 8px; font-size: 12px; font-family: 'Space Mono', monospace; animation: slideIn 0.3s; max-width: 340px; }
+  .toast-success { background: rgba(16,185,129,0.92); color: #fff; }
+  .toast-error   { background: rgba(239,68,68,0.92); color: #fff; }
+  .toast-info    { background: rgba(0,212,255,0.92); color: #000; }
+  .toast-warn    { background: rgba(245,158,11,0.92); color: #000; }
+  @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; max-width: 500px; width: 92%; }
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+  .modal-body { font-size: 12px; color: var(--text-dim); line-height: 1.75; margin-bottom: 20px; }
+  .modal-body code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--accent); }
+  .modal-body ol { padding-left: 18px; margin-top: 8px; }
+  .modal-body li { margin-bottom: 6px; }
+  .modal-body a { color: var(--accent); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">🤖</div>
+      <div>
+        <div class="logo-label">AI TOOL MANAGER</div>
+        <div class="logo-sub">Gemini 2.5 × Google Sheets 自動同期</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="auth-status">
+        <div class="auth-dot" id="auth-dot"></div>
+        <span id="auth-text">Googleログイン未実行</span>
+      </div>
+      <button class="btn btn-google" id="btn-login" onclick="handleLogin()">
+        <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Googleログイン
+      </button>
+      <button class="btn btn-danger" id="btn-logout" onclick="handleLogout()" style="display:none">ログアウト</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Gemini設定 -->
+  <div class="panel">
+    <div class="panel-title">🔮 Gemini API 設定（情報収集エンジン）</div>
+    <div class="apikey-row">
+      <div class="field">
+        <div class="field-label">Gemini API キー &nbsp;<span style="color:var(--accent3);font-size:10px">無料で取得可能</span></div>
+        <input type="password" id="input-gemini-key" placeholder="AIza..." />
+      </div>
+      <button class="btn btn-warn" onclick="showModal('modal-gemini-help')">🔑 キー取得方法</button>
+    </div>
+    <div class="field-label">使用モデル</div>
+    <div class="model-select-row">
+      <div class="model-chip active" data-model="gemini-2.5-flash-preview-04-17" onclick="selectModel(this)">
+        gemini-2.5-flash ⚡ &nbsp;<span style="font-size:10px;opacity:0.7">推奨・無料500req/日</span>
+      </div>
+      <div class="model-chip" data-model="gemini-2.5-pro-preview-05-06" onclick="selectModel(this)">
+        gemini-2.5-pro 🧠 &nbsp;<span style="font-size:10px;opacity:0.7">高精度・無料25req/日</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sheets設定 -->
+  <div class="panel">
+    <div class="panel-title">📊 Google Sheets 設定</div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:12px;">
+      <div class="field">
+        <div class="field-label">Google OAuth2 クライアント ID &nbsp;<span style="color:var(--danger);font-size:10px">必須</span></div>
+        <input type="text" id="input-client-id" placeholder="000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com" />
+        <div class="field-hint">Google Cloud Console で取得したOAuth2クライアントID（ <code style="font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:3px;color:var(--accent)">〇〇〇.apps.googleusercontent.com</code> の形式）</div>
+      </div>
+      <button class="btn btn-warn" onclick="showModal('modal-sheets-help')" style="align-self:start;margin-top:22px">⚙️ 取得方法</button>
+    </div>
+    <div class="settings-grid">
+      <div class="field">
+        <div class="field-label">スプレッドシート ID</div>
+        <input type="text" id="input-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
+        <div class="field-hint">URLの /d/【ここ】/edit の部分</div>
+      </div>
+      <div class="field">
+        <div class="field-label">シート名（タブ名）</div>
+        <input type="text" id="input-sheet-name" value="AI情報一覧" />
+      </div>
+      <div></div>
+    </div>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="action-bar">
+    <button class="btn btn-primary" id="btn-scrape" onclick="runScraping(false)">🔍 データ収集のみ</button>
+    <button class="btn btn-success" id="btn-sync" onclick="syncToSheets()" disabled>📊 Sheetsへ同期</button>
+    <div class="divider"></div>
+    <button class="btn btn-secondary" id="btn-auto" onclick="runScraping(true)">⚡ 収集 → 自動同期</button>
+    <div class="divider"></div>
+    <button class="btn btn-danger" onclick="clearData()">🗑 クリア</button>
+    <div class="ml-auto"><span class="last-sync" id="last-sync-label"></span></div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-box">
+    <div class="status-line">
+      <div class="sdot idle" id="sdot"></div>
+      <span class="stext" id="stext">待機中 ── Gemini APIキーを入力して「収集 → 自動同期」を押してください</span>
+    </div>
+    <div class="prog-wrap" id="prog-wrap"><div class="prog-bar" id="prog-bar"></div></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-val" id="stat-total">0</div><div class="stat-label">収集済みツール数</div></div>
+    <div class="stat-card"><div class="stat-val" id="stat-cats">0</div><div class="stat-label">カテゴリ数</div></div>
+    <div class="stat-card"><div class="stat-val" id="stat-free">0</div><div class="stat-label">無料枠あり</div></div>
+    <div class="stat-card"><div class="stat-val" id="stat-synced" style="color:var(--accent3)">—</div><div class="stat-label">Sheets 同期数</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <input type="search" id="q" placeholder="🔍 ツール名・概要を検索..." oninput="renderTable()" />
+    <select id="f-cat" onchange="renderTable()"><option value="">全カテゴリ</option></select>
+    <select id="f-free" onchange="renderTable()">
+      <option value="">料金すべて</option>
+      <option value="yes">無料枠あり</option>
+      <option value="no">有料のみ</option>
+    </select>
+    <select id="f-rating" onchange="renderTable()">
+      <option value="">おすすめ度すべて</option>
+      <option value="5">★★★★★</option>
+      <option value="4">★★★★以上</option>
+      <option value="3">★★★以上</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <div class="table-header">
+      <span class="table-title" id="tbl-label">データなし</span>
+      <span style="font-size:11px;color:var(--text-muted)">ヘッダークリックでソート</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th onclick="sortBy('no')">No</th>
+          <th onclick="sortBy('name')">ツール名</th>
+          <th onclick="sortBy('category')">カテゴリ</th>
+          <th onclick="sortBy('summary')">概要</th>
+          <th onclick="sortBy('features')">主な特徴</th>
+          <th onclick="sortBy('free')">無料枠</th>
+          <th onclick="sortBy('rating')">おすすめ度</th>
+          <th onclick="sortBy('usecase')">一番特化した使用例</th>
+          <th onclick="sortBy('updated')">更新日</th>
+        </tr></thead>
+        <tbody id="tbody">
+          <tr class="empty-row"><td colspan="9">まだデータがありません</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast-container" id="toasts"></div>
+
+<!-- Modal: Gemini APIキー -->
+<div class="modal-overlay" id="modal-gemini-help">
+  <div class="modal">
+    <div class="modal-title">🔮 Gemini API キーの取得方法（無料）</div>
+    <div class="modal-body">
+      <ol>
+        <li><a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a> を開く</li>
+        <li>Googleアカウントでサインイン</li>
+        <li>「<strong>Create API key</strong>」をクリック</li>
+        <li>プロジェクトを選択または新規作成</li>
+        <li><code>AIza...</code> で始まるキーをコピーして上の入力欄に貼り付ける</li>
+      </ol>
+      <br>
+      <strong>無料枠（2025年現在）</strong><br>
+      • gemini-2.5-flash：毎日 500リクエスト<br>
+      • gemini-2.5-pro：毎日 25リクエスト<br>
+      クレジットカード不要です。
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-gemini-help')">閉じる</button>
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" class="btn btn-primary">AI Studio を開く →</a>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Sheets設定 -->
+<div class="modal-overlay" id="modal-sheets-help">
+  <div class="modal">
+    <div class="modal-title">📊 Google Sheets 連携の設定方法</div>
+    <div class="modal-body">
+      <strong>① スプレッドシートIDの確認</strong>
+      <ol>
+        <li>更新したいGoogleスプレッドシートを開く</li>
+        <li>URLの <code>/d/【ここ】/edit</code> の部分をコピーして入力欄へ</li>
+      </ol>
+      <br>
+      <strong>② Google Cloud Console の設定（初回のみ）</strong>
+      <ol>
+        <li><a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> を開く</li>
+        <li>「APIとサービス」→「<strong>Google Sheets API</strong>」を有効化</li>
+        <li>「認証情報」→「OAuth クライアントID」を作成<br>（種類：<code>ウェブアプリケーション</code>）</li>
+        <li>「承認済みのJavaScript生成元」にこのHTMLを置くURL（例：<code>http://localhost:8080</code>）を追加</li>
+        <li>取得したクライアントIDを、アプリ画面の「<strong>Google OAuth2 クライアントID</strong>」入力欄に貼り付ける</li>
+      </ol>
+      <br>
+      ※ スプレッドシートはログインするGoogleアカウントで「編集者」権限があればOKです。
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-sheets-help')">閉じる</button>
+      <a href="https://console.cloud.google.com/" target="_blank" class="btn btn-primary">Cloud Console →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  ★ Google OAuth2 クライアントIDをここに設定してください ★
+// ============================================================
+// クライアントIDは画面の入力欄から取得します
+function getClientId() { return document.getElementById('input-client-id').value.trim(); }
+
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+let tools = [], filtered = [];
+let sortKey = 'no', sortAsc = true;
+let accessToken = null, userEmail = '';
+let selectedModel = 'gemini-2.5-flash-preview-04-17';
+
+// モデル選択
+function selectModel(el) {
+  document.querySelectorAll('.model-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  selectedModel = el.dataset.model;
+}
+
+// Google OAuth2
+function handleLogin() {
+  const clientId = getClientId();
+  if (!clientId) {
+    toast('error', 'Google OAuth2 クライアントIDを入力してください');
+    document.getElementById('input-client-id').focus();
+    return;
+  }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: SCOPES,
+    callback: async (resp) => {
+      if (!resp.access_token) return;
+      accessToken = resp.access_token;
+      try {
+        const r = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: `Bearer ${accessToken}` } });
+        const info = await r.json();
+        userEmail = info.email || '';
+      } catch {}
+      setAuthUI(true);
+      toast('success', `ログイン成功${userEmail ? ': ' + userEmail : ''}`);
+      if (tools.length > 0) document.getElementById('btn-sync').disabled = false;
+    }
+  });
+  client.requestAccessToken();
+}
+
+function handleLogout() {
+  accessToken = null; userEmail = '';
+  setAuthUI(false);
+  document.getElementById('btn-sync').disabled = true;
+  toast('info', 'ログアウトしました');
+}
+
+function setAuthUI(ok) {
+  document.getElementById('auth-dot').className = `auth-dot${ok ? ' ok' : ''}`;
+  document.getElementById('auth-text').textContent = ok ? (userEmail || 'ログイン済み') : 'Googleログイン未実行';
+  document.getElementById('btn-login').style.display = ok ? 'none' : '';
+  document.getElementById('btn-logout').style.display = ok ? '' : 'none';
+}
+
+// Gemini API呼び出し
+async function callGemini(apiKey, prompt) {
+  const url = `${GEMINI_BASE}/${selectedModel}:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 8192, temperature: 0.2 }
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || `Gemini API Error ${res.status}`);
+  }
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// JSON抽出ヘルパー
+function extractTools(text) {
+  const m = text.match(/\{[\s\S]*?"tools"[\s\S]*?\}/);
+  if (m) { try { return JSON.parse(m[0]).tools || []; } catch {} }
+  const arr = text.match(/\[[\s\S]*?\]/);
+  if (arr) { try { return JSON.parse(arr[0]); } catch {} }
+  return [];
+}
+
+// バッチ収集
+async function fetchBatch(apiKey, batchNum) {
+  const catsList = [
+    '画像生成、動画生成、音楽生成、コーディング・開発支援、AI検索、生成AI（ChatGPT/Claude/Gemini等のLLM）、プレゼン・スライド資料生成、文字起こし・議事録',
+    '文章生成・コンテンツ生成、音声生成・テキスト読み上げ、デザイン・ロゴ生成、マーケティング・SEO、データ分析、ノーコード・自動化・ワークフロー、翻訳・要約、教育・ヘルスケア・業界特化AI'
+  ];
+  const prompt = `あなたは日本のAIツール情報の専門家です。
+日本のAIツール紹介サイト「AIツールギャラリー」(https://ai-gallery.jp/tools/) に掲載されている実在するAIツールを、
+以下のカテゴリから各カテゴリ4〜6件ずつ、合計30件以上を回答してください。
+
+対象カテゴリ: ${catsList[batchNum - 1]}
+
+以下のJSON形式のみで回答してください。前置き・説明文・コードブロック記号は不要です：
+
+{"tools":[{"name":"ツール名","category":"カテゴリ（日本語）","summary":"概要（1〜2文の日本語）","features":"主な特徴（1文）","free":"あり または なし","rating":整数1〜5,"usecase":"最も特化した具体的使用例（日本語）","url":"https://公式URL"}]}
+
+実在するAIツールのみ。架空のツールは絶対に含めないでください。`;
+
+  const text = await callGemini(apiKey, prompt);
+  return extractTools(text);
+}
+
+// メイン収集処理
+async function runScraping(autoSync) {
+  const apiKey = document.getElementById('input-gemini-key').value.trim();
+  if (!apiKey) { toast('error', 'Gemini APIキーを入力してください'); return; }
+
+  tools = []; renderTable(); updateStats();
+  setBtns(true);
+  setStatus('running', 'Gemini 2.5 でデータ収集を開始します...');
+  setProgress(10);
+
+  try {
+    setStatus('running', 'バッチ1/2：画像生成・動画・開発・LLM 系を収集中...');
+    setProgress(20);
+    const b1 = await fetchBatch(apiKey, 1);
+    setProgress(50);
+
+    setStatus('running', 'バッチ2/2：文章生成・デザイン・マーケ・自動化 系を収集中...');
+    const b2 = await fetchBatch(apiKey, 2);
+    setProgress(80);
+
+    // 重複除去・番号付け
+    const seen = new Set();
+    tools = [...b1, ...b2].filter(t => {
+      const k = (t.name || '').toLowerCase().trim();
+      if (!k || seen.has(k)) return false;
+      seen.add(k); return true;
+    }).map((t, i) => ({ ...t, no: i + 1 }));
+
+    setProgress(95);
+    setStatus('done', `✅ 収集完了: ${tools.length} 件のAIツールを取得しました`);
+    toast('success', `${tools.length}件を収集しました`);
+
+    renderTable(); updateStats(); populateFilter();
+    if (tools.length > 0 && accessToken) document.getElementById('btn-sync').disabled = false;
+
+    if (autoSync) {
+      if (!accessToken) toast('warn', '自動同期にはGoogleログインが必要です');
+      else { await sleep(500); await syncToSheets(); }
+    }
+
+  } catch (e) {
+    console.error(e);
+    setStatus('error', `エラー: ${e.message}`);
+    toast('error', e.message);
+  } finally {
+    setBtns(false);
+    setProgress(0);
+  }
+}
+
+// Sheets同期
+async function syncToSheets() {
+  if (!accessToken) { toast('error', 'Googleにログインしてください'); return; }
+  if (tools.length === 0) { toast('error', 'データがありません'); return; }
+
+  const sheetId   = document.getElementById('input-sheet-id').value.trim();
+  const sheetName = document.getElementById('input-sheet-name').value.trim() || 'AI情報一覧';
+  if (!sheetId) { toast('error', 'スプレッドシートIDを入力してください'); return; }
+
+  document.getElementById('btn-sync').disabled = true;
+  setStatus('sheets', `Google Sheets へ同期中... (${tools.length}件)`);
+  setProgress(15);
+
+  try {
+    // クリア
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(sheetName)}:clear`, {
+      method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
+    });
+    setProgress(35);
+
+    const today = new Date().toLocaleDateString('ja-JP');
+    const values = [
+      ['No','ツール名','カテゴリ','概要','主な特徴','無料枠','おすすめ度','一番特化した使用例','URL','更新日'],
+      ...tools.map((t, i) => [
+        i+1, t.name||'', t.category||'', t.summary||'', t.features||'',
+        t.free||'なし',
+        '★'.repeat(Math.min(5, Math.max(0, parseInt(t.rating)||3))),
+        t.usecase||'', t.url||'', today
+      ])
+    ];
+    setProgress(55);
+
+    const range = `${sheetName}!A1`;
+    const wr = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ range, majorDimension: 'ROWS', values })
+    });
+    if (!wr.ok) { const e = await wr.json(); throw new Error(e.error?.message || `Sheets API ${wr.status}`); }
+    setProgress(75);
+
+    await applyFormat(sheetId, sheetName);
+    setProgress(100);
+
+    const now = new Date().toLocaleString('ja-JP');
+    document.getElementById('last-sync-label').textContent = `最終同期: ${now}`;
+    document.getElementById('stat-synced').textContent = tools.length;
+    setStatus('done', `✅ Google Sheets へ ${tools.length}件 を同期しました（${now}）`);
+    toast('success', `Sheets同期完了: ${tools.length}件`);
+
+  } catch (e) {
+    console.error(e);
+    setStatus('error', `同期エラー: ${e.message}`);
+    toast('error', `同期失敗: ${e.message}`);
+    if (/401|UNAUTHENTICATED/.test(e.message)) {
+      accessToken = null; setAuthUI(false);
+      toast('warn', 'セッション期限切れ。再ログインしてください');
+    }
+  } finally {
+    setProgress(0);
+    document.getElementById('btn-sync').disabled = false;
+  }
+}
+
+async function applyFormat(sheetId, sheetName) {
+  try {
+    const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    const sid = (await r.json()).sheets?.find(s => s.properties.title === sheetName)?.properties?.sheetId;
+    if (sid === undefined) return;
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests: [
+        { repeatCell: {
+          range: { sheetId: sid, startRowIndex: 0, endRowIndex: 1 },
+          cell: { userEnteredFormat: {
+            backgroundColor: { red: 0.067, green: 0.094, blue: 0.153 },
+            textFormat: { bold: true, foregroundColor: { red: 0, green: 0.831, blue: 1 }, fontSize: 10 },
+            horizontalAlignment: 'CENTER'
+          }},
+          fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)'
+        }},
+        { autoResizeDimensions: { dimensions: { sheetId: sid, dimension: 'COLUMNS', startIndex: 0, endIndex: 10 }}},
+        { updateSheetProperties: { properties: { sheetId: sid, gridProperties: { frozenRowCount: 1 }}, fields: 'gridProperties.frozenRowCount' }}
+      ]})
+    });
+  } catch (e) { console.warn('書式設定スキップ:', e.message); }
+}
+
+// UIヘルパー
+function setStatus(type, msg) {
+  document.getElementById('sdot').className = `sdot ${type}`;
+  document.getElementById('stext').textContent = msg;
+}
+function setProgress(p) {
+  document.getElementById('prog-wrap').style.display = p > 0 ? 'block' : 'none';
+  document.getElementById('prog-bar').style.width = p + '%';
+}
+function setBtns(disabled) {
+  ['btn-scrape','btn-auto','btn-sync'].forEach(id => document.getElementById(id).disabled = disabled);
+}
+function updateStats() {
+  document.getElementById('stat-total').textContent = tools.length;
+  document.getElementById('stat-cats').textContent = new Set(tools.map(t => t.category).filter(Boolean)).size;
+  document.getElementById('stat-free').textContent = tools.filter(t => t.free === 'あり').length;
+}
+function populateFilter() {
+  const cats = [...new Set(tools.map(t => t.category).filter(Boolean))].sort();
+  document.getElementById('f-cat').innerHTML = '<option value="">全カテゴリ</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+function renderTable() {
+  const q = document.getElementById('q').value.toLowerCase();
+  const fc = document.getElementById('f-cat').value;
+  const ff = document.getElementById('f-free').value;
+  const fr = parseInt(document.getElementById('f-rating').value) || 0;
+
+  filtered = tools.filter(t => {
+    if (q && !`${t.name} ${t.summary} ${t.usecase}`.toLowerCase().includes(q)) return false;
+    if (fc && t.category !== fc) return false;
+    if (ff === 'yes' && t.free !== 'あり') return false;
+    if (ff === 'no'  && t.free === 'あり') return false;
+    if (fr && (parseInt(t.rating)||0) < fr) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    let av = a[sortKey], bv = b[sortKey];
+    if (sortKey === 'no' || sortKey === 'rating') { av = parseInt(av)||0; bv = parseInt(bv)||0; }
+    else { av = String(av||'').toLowerCase(); bv = String(bv||'').toLowerCase(); }
+    return sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+  });
+
+  document.getElementById('tbl-label').textContent = tools.length ? `${filtered.length}件 / 全${tools.length}件` : 'データなし';
+
+  const palette = ['#7c3aed','#0891b2','#059669','#d97706','#dc2626','#6366f1','#0284c7','#16a34a','#9333ea','#0369a1'];
+  const cc = {}; let ci = 0;
+
+  document.getElementById('tbody').innerHTML = filtered.length === 0
+    ? `<tr class="empty-row"><td colspan="9">${tools.length ? '該当なし' : 'まだデータがありません'}</td></tr>`
+    : filtered.map(t => {
+        if (!cc[t.category]) cc[t.category] = palette[ci++ % palette.length];
+        const c = cc[t.category];
+        const r = Math.min(5, Math.max(0, parseInt(t.rating)||3));
+        return `<tr>
+          <td class="no-col">${t.no}</td>
+          <td><div class="tool-name">${esc(t.name)}</div>${t.url ? `<a class="tool-url" href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.url.replace(/^https?:\/\//,'').split('/')[0])}</a>` : ''}</td>
+          <td><span class="cat-tag" style="background:${c}22;color:${c}">${esc(t.category)}</span></td>
+          <td>${esc(t.summary)}</td>
+          <td>${esc(t.features)}</td>
+          <td><span class="free-badge ${t.free==='あり'?'free-yes':'free-no'}">${t.free==='あり'?'✓ あり':'なし'}</span></td>
+          <td><span class="stars">${'★'.repeat(r)+'☆'.repeat(5-r)}</span></td>
+          <td>${esc(t.usecase)}</td>
+          <td style="font-family:'Space Mono',monospace;font-size:10px;white-space:nowrap;color:var(--text-muted)">${new Date().toLocaleDateString('ja-JP')}</td>
+        </tr>`;
+      }).join('');
+}
+function sortBy(key) {
+  sortAsc = sortKey === key ? !sortAsc : true;
+  sortKey = key;
+  renderTable();
+}
+function clearData() {
+  if (tools.length && !confirm('収集データを削除しますか？')) return;
+  tools = []; renderTable(); updateStats();
+  setStatus('idle', '待機中 ── データをクリアしました');
+  document.getElementById('btn-sync').disabled = true;
+  document.getElementById('stat-synced').textContent = '—';
+  document.getElementById('f-cat').innerHTML = '<option value="">全カテゴリ</option>';
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function toast(type, msg) {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`; el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+function showModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+// 設定をlocalStorageに永続化
+window.addEventListener('load', () => {
+  const s = JSON.parse(localStorage.getItem('ai-mgr-cfg') || '{}');
+  if (s.clientId)  document.getElementById('input-client-id').value = s.clientId;
+  if (s.sheetId)   document.getElementById('input-sheet-id').value = s.sheetId;
+  if (s.sheetName) document.getElementById('input-sheet-name').value = s.sheetName;
+});
+['input-client-id','input-sheet-id','input-sheet-name'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    localStorage.setItem('ai-mgr-cfg', JSON.stringify({
+      clientId:  document.getElementById('input-client-id').value,
+      sheetId:   document.getElementById('input-sheet-id').value,
+      sheetName: document.getElementById('input-sheet-name').value
+    }));
+  });
+});
+</script>
+</body>
+</html>
