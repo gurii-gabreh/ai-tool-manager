@@ -199,7 +199,7 @@
     </div>
     <div class="field-label">使用モデル</div>
     <div class="model-select-row">
-      <div class="model-chip active" data-model="gemini-2.5-flash-preview-04-17" onclick="selectModel(this)">
+      <div class="model-chip active" data-model="gemini-2.5-flash-preview-05-20" onclick="selectModel(this)">
         gemini-2.5-flash ⚡ &nbsp;<span style="font-size:10px;opacity:0.7">推奨・無料500req/日</span>
       </div>
       <div class="model-chip" data-model="gemini-2.5-pro-preview-05-06" onclick="selectModel(this)">
@@ -375,7 +375,7 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 let tools = [], filtered = [];
 let sortKey = 'no', sortAsc = true;
 let accessToken = null, userEmail = '';
-let selectedModel = 'gemini-2.5-flash-preview-04-17';
+let selectedModel = 'gemini-2.5-flash-preview-05-20';
 
 // モデル選択
 function selectModel(el) {
