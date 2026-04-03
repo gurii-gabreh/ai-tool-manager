@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>AI ツール情報収集・管理システム</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
@@ -241,6 +244,8 @@
     <button class="btn btn-secondary" id="btn-auto" onclick="runScraping(true)">⚡ 収集 → 自動同期</button>
     <div class="divider"></div>
     <button class="btn btn-danger" onclick="clearData()">🗑 クリア</button>
+    <button class="btn btn-warn" onclick="resetSettings()">⚙️ 設定リセット</button>
+    <button class="btn btn-secondary" onclick="hardReload()">🔄 キャッシュクリア</button>
     <div class="ml-auto"><span class="last-sync" id="last-sync-label"></span></div>
   </div>
 
@@ -698,6 +703,29 @@ function clearData() {
 }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function resetSettings() {
+  if (!confirm('設定（クライアントID・スプレッドシートID・シート名）をリセットしますか？\nGemini APIキーも入力欄からクリアされます。')) return;
+  localStorage.removeItem('ai-mgr-cfg');
+  document.getElementById('input-client-id').value = '';
+  document.getElementById('input-sheet-id').value = '';
+  document.getElementById('input-sheet-name').value = 'AI情報一覧';
+  document.getElementById('input-gemini-key').value = '';
+  toast('success', '設定をリセットしました。各項目を再入力してください。');
+}
+
+function hardReload() {
+  if (!confirm('キャッシュをクリアしてページを再読み込みしますか？\n入力中のデータは失われます。')) return;
+  // Service Workerのキャッシュもクリア
+  if ('caches' in window) {
+    caches.keys().then(names => {
+      names.forEach(name => caches.delete(name));
+    });
+  }
+  // キャッシュなしで強制リロード
+  const url = location.href.split('?')[0] + '?nocache=' + Date.now();
+  location.replace(url);
+}
 function toast(type, msg) {
   const el = document.createElement('div');
   el.className = `toast toast-${type}`; el.textContent = msg;
