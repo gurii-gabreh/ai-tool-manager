@@ -451,32 +451,68 @@ async function callGemini(apiKey, prompt) {
 
 // JSON抽出ヘルパー
 function extractTools(text) {
-  const m = text.match(/\{[\s\S]*?"tools"[\s\S]*?\}/);
-  if (m) { try { return JSON.parse(m[0]).tools || []; } catch {} }
-  const arr = text.match(/\[[\s\S]*?\]/);
-  if (arr) { try { return JSON.parse(arr[0]); } catch {} }
+  if (!text) return [];
+
+  // コードブロック除去
+  text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+  // {"tools":[...]} 形式
+  const m = text.match(/\{[\s\S]*?"tools"[\s\S]*\}/);
+  if (m) {
+    try {
+      const parsed = JSON.parse(m[0]);
+      if (parsed.tools && parsed.tools.length > 0) return parsed.tools;
+    } catch {}
+  }
+
+  // [...] 配列形式
+  const arrMatch = text.match(/\[[\s\S]*\]/);
+  if (arrMatch) {
+    try {
+      const parsed = JSON.parse(arrMatch[0]);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+  }
+
+  // 先頭が [ で始まる場合
+  if (text.trim().startsWith('[')) {
+    try { return JSON.parse(text.trim()); } catch {}
+  }
+
+  console.warn('JSON抽出失敗。レスポンス:', text.substring(0, 500));
   return [];
 }
 
 // バッチ収集
 async function fetchBatch(apiKey, batchNum) {
-  const catsList = [
-    '画像生成、動画生成、音楽生成、コーディング・開発支援、AI検索、生成AI（ChatGPT/Claude/Gemini等のLLM）、プレゼン・スライド資料生成、文字起こし・議事録',
-    '文章生成・コンテンツ生成、音声生成・テキスト読み上げ、デザイン・ロゴ生成、マーケティング・SEO、データ分析、ノーコード・自動化・ワークフロー、翻訳・要約、教育・ヘルスケア・業界特化AI'
+  const batches = [
+    {
+      cats: '画像生成・動画生成・音楽生成・コーディング開発・AI検索・生成AI（LLM）・プレゼン資料・文字起こし',
+      examples: 'Midjourney, DALL-E 3, Stable Diffusion, Leonardo.ai, Runway, Sora, Kling, Luma Dream Machine, Suno, Udio, GitHub Copilot, Cursor, Windsurf, Bolt.new, v0.dev, Perplexity AI, Felo, ChatGPT, Claude, Gemini, Grok, Gamma, Napkin AI, イルシル, Notta'
+    },
+    {
+      cats: '文章生成・音声合成・デザイン・マーケティングSEO・データ分析・ノーコード自動化・翻訳要約・教育ヘルスケア',
+      examples: 'Jasper, Copy.ai, ElevenLabs, Murf, Canva AI, Adobe Firefly, Recraft AI, Krea AI, Surfer SEO, MarketMuse, Tableau AI, Julius, Dify, Make, Zapier AI, DeepL, Notion AI, Duolingo AI, Khan Academy AI, HeyGen, Synthesia'
+    }
   ];
-  const prompt = `あなたは日本のAIツール情報の専門家です。
-日本のAIツール紹介サイト「AIツールギャラリー」(https://ai-gallery.jp/tools/) に掲載されている実在するAIツールを、
-以下のカテゴリから各カテゴリ4〜6件ずつ、合計30件以上を回答してください。
+  const b = batches[batchNum - 1];
 
-対象カテゴリ: ${catsList[batchNum - 1]}
+  const prompt = `以下のAIツールについて、JSON形式でデータを返してください。
 
-以下のJSON形式のみで回答してください。前置き・説明文・コードブロック記号は不要です：
+対象ツールの例: ${b.examples}
+カテゴリ群: ${b.cats}
 
-{"tools":[{"name":"ツール名","category":"カテゴリ（日本語）","summary":"概要（1〜2文の日本語）","features":"主な特徴（1文）","free":"あり または なし","rating":整数1〜5,"usecase":"最も特化した具体的使用例（日本語）","url":"https://公式URL"}]}
+上記の例を含め、各カテゴリから実在するAIツールを合計25〜35件選んでください。
 
-実在するAIツールのみ。架空のツールは絶対に含めないでください。`;
+【重要】回答はJSON配列のみ。説明文・前置き・コードブロック(\`\`\`)は絶対に含めないこと。
+
+[{"name":"ChatGPT","category":"生成AI","summary":"OpenAIが開発した高性能な対話型AIアシスタント。","features":"自然言語での質問応答・文章生成・コード作成に対応","free":"あり","rating":5,"usecase":"ビジネス文書の作成やプログラミングの補助","url":"https://chat.openai.com"},
+{"name":"Midjourney","category":"画像生成","summary":"テキストから高品質な画像を生成するAIツール。","features":"芸術的で高品質な画像生成が得意","free":"なし","rating":5,"usecase":"広告用ビジュアルやイラストの制作","url":"https://midjourney.com"}]
+
+上記の形式でJSONのみ返してください。`;
 
   const text = await callGemini(apiKey, prompt);
+  console.log('Gemini response batch' + batchNum + ':', text.substring(0, 200));
   return extractTools(text);
 }
 
@@ -509,8 +545,13 @@ async function runScraping(autoSync) {
     }).map((t, i) => ({ ...t, no: i + 1 }));
 
     setProgress(95);
-    setStatus('done', `✅ 収集完了: ${tools.length} 件のAIツールを取得しました`);
-    toast('success', `${tools.length}件を収集しました`);
+    if (tools.length === 0) {
+      setStatus('error', '⚠️ データ取得できませんでした。Gemini APIキーを確認して再試行してください。');
+      toast('error', 'データ取得失敗。コンソールを確認してください（F12）');
+    } else {
+      setStatus('done', `✅ 収集完了: ${tools.length} 件のAIツールを取得しました`);
+      toast('success', `${tools.length}件を収集しました`);
+    }
 
     renderTable(); updateStats(); populateFilter();
     if (tools.length > 0 && accessToken) document.getElementById('btn-sync').disabled = false;
