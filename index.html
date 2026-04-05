@@ -582,130 +582,154 @@ function extractTools(text) {
   return [];
 }
 
-// バッチ収集
-// 全カテゴリ × 詳細ツールリスト（12バッチ）
-const BATCHES = [
-  {
-    cat: '画像生成',
-    examples: 'Midjourney, DALL-E 3, Stable Diffusion, Leonardo.ai, Adobe Firefly, Krea AI, Recraft AI, Ideogram, Canva AI, Bing Image Creator, Playground AI, Seaart AI, Tensor.Art, NightCafe, Dreamina, Fotor AI, Picsart AI, Remove.bg, Clipdrop, Photoroom, PicWish, Cutout.Pro, Magic Eraser, Lensa AI, FaceApp'
-  },
-  {
-    cat: '動画生成',
-    examples: 'Runway, Sora, Kling, Luma Dream Machine, Pika Labs, Stable Video Diffusion, HeyGen, Synthesia, D-ID, InVideo AI, Opus Clip, Descript, Wondershare Filmora AI, CapCut AI, Veed.io, Fliki, Pictory AI, Steve AI, Colossyan, DeepBrain AI, Captions, Wisecut, Munch, Vizard, Vrew'
-  },
-  {
-    cat: '音楽生成・音声',
-    examples: 'Suno, Udio, ElevenLabs, Murf, Descript, Adobe Podcast, Resemble AI, Speechify, Play.ht, AIVA, Soundraw, Boomy, Loudly, Beatoven.ai, Voicemod, Altered AI, Respeecher, Podcastle, Cleanvoice, Auphonic, Voice.ai, Kits.ai, Musicfy, Riffusion, Splash Pro'
-  },
-  {
-    cat: 'コーディング・開発',
-    examples: 'GitHub Copilot, Cursor, Windsurf, Bolt.new, v0.dev, Replit AI, Tabnine, Codeium, Amazon CodeWhisperer, Devin, Aider, Continue.dev, Sourcegraph Cody, Codestral, JetBrains AI, Blackbox AI, Phind, Pieces for Developers, Fig AI, Warp AI, Mutable AI, Safurai, CodeT5, StarCoder, WizardCoder'
-  },
-  {
-    cat: '生成AI・LLM',
-    examples: 'ChatGPT, Claude, Gemini, Grok, Llama, Mistral, Copilot, Perplexity AI, You.com, Pi, Character.AI, Poe, Hugging Chat, Cohere, Together AI, Replicate, Groq, DeepSeek, Qwen, Command R, Falcon, Vicuna, WizardLM, OpenChat, Phi'
-  },
-  {
-    cat: 'AI検索・リサーチ',
-    examples: 'Perplexity AI, Felo, SearchGPT, Bing AI, Google AI Overview, You.com, Exa AI, Elicit, Consensus, Semantic Scholar, Research Rabbit, Undermind, Sourcely, Jenni AI, SciSpace, Explainpaper, Connected Papers, Scite, Litmaps, Keenious, Paperdigest, Inciteful, Iris.ai, Scholarcy, ChatPDF'
-  },
-  {
-    cat: 'プレゼン・スライド・資料生成',
-    examples: 'Gamma, Napkin AI, イルシル, Beautiful.ai, Tome, Pitch, Presentations.ai, SlidesAI, MagicSlides, Decktopus, Plus AI, Kroma, Slidebean, Canva Presentations, PopAI, Storydoc, Visme AI, Simplified AI, Prezo, Sendsteps, Deckrobot, Designs.ai, Motionit.ai, ChatBA, Powerpresent AI'
-  },
-  {
-    cat: '文字起こし・議事録・要約',
-    examples: 'Notta, Otter.ai, Fireflies.ai, Grain, Trint, Rev, Sonix, Descript, Whisper, AssemblyAI, Deepgram, Verbit, Transkriptor, Speak AI, MeetGeek, Avoma, Fathom, Sembly AI, Read AI, Hugo, Tactiq, Krisp, Airgram, Fellow, Supernormal'
-  },
-  {
-    cat: '文章生成・ライティング',
-    examples: 'Jasper, Copy.ai, Writesonic, Rytr, Anyword, Wordtune, QuillBot, Grammarly AI, ProWritingAid, Hemingway AI, Sudowrite, NovelAI, Inkitt AI, Squibler, Shortly AI, Hypotenuse AI, Peppertype, Copysmith, Scalenut, Frase, Longshot AI, Closers Copy, Nichesss, Describely, GrowthBar'
-  },
-  {
-    cat: 'デザイン・マーケティング・SEO',
-    examples: 'Canva AI, Adobe Express AI, Looka, Brandmark, Tailor Brands, Designs.ai, Uizard, Framer AI, Durable, 10Web, Hostinger AI, Wix ADI, Surfer SEO, Clearscope, MarketMuse, Semrush AI, Ahrefs AI, Neuron Writer, INK, Outranking, Alli AI, Can I Rank, GrowthBar, Diib, RankIQ'
-  },
-  {
-    cat: 'ノーコード・自動化・業務効率化',
-    examples: 'Dify, Make, Zapier AI, n8n, Bubble AI, Glide AI, Adalo, AppGyver, Softr, Webflow AI, Notion AI, Coda AI, Airtable AI, ClickUp AI, Monday AI, Asana AI, Motion, Reclaim AI, Clockwise, Trevor AI, Mem.ai, Obsidian AI, Roam Research, Reflect, Logseq'
-  },
-  {
-    cat: '翻訳・教育・ヘルスケア・その他特化',
-    examples: 'DeepL, Google Translate AI, Papago, Reverso, Smartcat, Duolingo AI, Khan Academy AI, Coursera AI, Synthesis AI, Khanmigo, Socratic, Photomath, Wolfram Alpha AI, Elsa Speak, Speak, Ada Health, Babylon Health, K Health, Wysa, Woebot, DoNotPay, Harvey AI, Casetext, Latch, Runway ML'
+// ════════════════════════════════════════
+// WordPress REST API で ai-gallery.jp から全件取得
+// ════════════════════════════════════════
+const GALLERY_API = 'https://ai-gallery.jp/wp-json/wp/v2/tools';
+
+// カテゴリ名マッピング（taxonomy slugから日本語へ）
+const CAT_MAP = {
+  'image-generation': '画像生成', 'video': '動画生成', 'music': '音楽生成',
+  'coding': 'コーディング・開発', 'llm': '生成AI・LLM', 'ai-search': 'AI検索',
+  'presentation-slide': 'プレゼン・スライド', 'transcription': '文字起こし・議事録',
+  'writing': '文章生成', 'design': 'デザイン', 'marketing': 'マーケティング・SEO',
+  'no-code': 'ノーコード・自動化', 'translation': '翻訳', 'education': '教育',
+  'seo': 'SEO', 'ai-avatar': 'AIアバター', 'chatbot': 'AIチャットボット',
+  'data-analysis': 'データ分析', 'workflow': 'ワークフロー・自動化',
+  'summary': '要約', 'voice': '音声生成', 'image-editing': '画像編集',
+  'business': 'ビジネス', 'productivity': '生産性向上',
+};
+
+async function fetchAllFromAPI() {
+  let allPosts = [];
+  let page = 1;
+  let totalPages = 1;
+
+  // まず1ページ目を取得してtotal件数を確認
+  const firstRes = await fetch(`${GALLERY_API}?per_page=100&page=1&_fields=id,title,excerpt,link,tool-category,acf&status=publish`);
+  if (!firstRes.ok) throw new Error(`API Error: ${firstRes.status}`);
+
+  totalPages = parseInt(firstRes.headers.get('X-WP-TotalPages') || '1');
+  const totalItems = parseInt(firstRes.headers.get('X-WP-Total') || '0');
+  const firstData = await firstRes.json();
+  allPosts = [...firstData];
+
+  setStatus('running', `API接続成功！全${totalItems}件を${totalPages}ページに分けて取得中... (${allPosts.length}件完了)`);
+
+  // 残りのページを並列取得（レート制限を考慮して5ページずつ）
+  for (let p = 2; p <= totalPages; p += 5) {
+    const batch = [];
+    for (let pp = p; pp < p + 5 && pp <= totalPages; pp++) {
+      batch.push(fetch(`${GALLERY_API}?per_page=100&page=${pp}&_fields=id,title,excerpt,link,tool-category,acf&status=publish`));
+    }
+    const responses = await Promise.all(batch);
+    for (const res of responses) {
+      if (res.ok) {
+        const data = await res.json();
+        allPosts = [...allPosts, ...data];
+      }
+    }
+    setProgress(10 + (Math.min(p, totalPages) / totalPages) * 60);
+    setStatus('running', `取得中... ${allPosts.length}/${totalItems}件`);
+    await sleep(300); // レート制限対策
   }
-];
 
-async function fetchBatch(apiKey, batchNum) {
-  const b = BATCHES[batchNum - 1];
-  const prompt = `日本のAIツール紹介サイト「AIツールギャラリー」に掲載されているAIツールを、以下のカテゴリ「${b.cat}」について回答してください。
+  return allPosts;
+}
 
-以下のツールを参考に、このカテゴリの実在するAIツールを20〜25件リストアップしてください：
-${b.examples}
+function parseAPIPost(post, index) {
+  const title = post.title?.rendered || '';
+  const excerpt = post.excerpt?.rendered?.replace(/<[^>]*>/g, '').trim() || '';
+  const link = post.link || '';
+  const acf = post.acf || {};
 
-【絶対ルール】
-・回答はJSON配列のみ。説明文・前置き・コードブロック記号(\`\`\`)は一切含めない
-・実在するツールのみ（架空のツール禁止）
-・urlは実際の公式サイトURL
+  // カテゴリ取得
+  const cats = post['tool-category'] || [];
+  let category = '未分類';
+  if (cats.length > 0 && typeof cats[0] === 'string') {
+    category = CAT_MAP[cats[0]] || cats[0];
+  }
 
-[{"name":"ツール名","category":"${b.cat}","summary":"概要1〜2文","features":"主な特徴1文","free":"あり または なし","rating":整数1〜5,"usecase":"具体的な使用例","url":"https://公式URL"}]
+  // 料金プラン判定
+  const plan = (acf.price_plan || acf.plan || '').toLowerCase();
+  const free = (plan.includes('free') || plan.includes('無料') || plan === 'completely-free' || plan === 'basic-free') ? 'あり' : 'なし';
 
-JSONのみ返してください：`;
+  // おすすめ度（ビュー数や評価から算出）
+  const views = parseInt(acf.views || acf.view_count || 0);
+  const rating = views > 10000 ? 5 : views > 5000 ? 4 : views > 1000 ? 3 : 3;
 
-  const text = await callGemini(apiKey, prompt);
-  console.log(`バッチ${batchNum}(${b.cat}): ${text.substring(0, 100)}`);
-  return extractTools(text);
+  return {
+    no: index + 1,
+    name: title.replace(/&#[0-9]+;/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'),
+    category,
+    summary: excerpt.substring(0, 120) || `${title}のAIツール`,
+    features: acf.features || acf.description || excerpt.substring(0, 60) || `${category}に特化したAIツール`,
+    free,
+    rating,
+    usecase: acf.usecase || acf.use_case || `${category}での活用`,
+    url: link,
+    updated: new Date().toLocaleDateString('ja-JP')
+  };
 }
 
 // メイン収集処理
 async function runScraping(autoSync) {
   const apiKey = document.getElementById('input-gemini-key').value.trim();
-  if (!apiKey) { toast('error', 'Gemini APIキーを入力してください'); return; }
 
   tools = []; renderTable(); updateStats();
   setBtns(true);
-  setStatus('running', 'Gemini 2.5 でデータ収集を開始します...');
-  setProgress(10);
+  setStatus('running', 'ai-gallery.jp WordPress APIに接続中...');
+  setProgress(5);
 
   try {
-    const totalBatches = BATCHES.length;
-    let allResults = [];
+    // ── Step1: WordPress REST APIで全件取得を試みる ──
+    let apiSuccess = false;
+    try {
+      setStatus('running', 'ai-gallery.jp から全ツールデータを直接取得中...');
+      const posts = await fetchAllFromAPI();
 
-    for (let i = 0; i < totalBatches; i++) {
-      const batchNum = i + 1;
-      const cat = BATCHES[i].cat;
-      setStatus('running', `バッチ ${batchNum}/${totalBatches}：「${cat}」を収集中... (累計${allResults.length}件)`);
-      setProgress(10 + (i / totalBatches) * 75);
-
-      try {
-        const result = await fetchBatch(apiKey, batchNum);
-        allResults = [...allResults, ...result];
-        console.log(`バッチ${batchNum}完了: ${result.length}件取得（累計${allResults.length}件）`);
-      } catch (e) {
-        console.warn(`バッチ${batchNum}失敗:`, e.message);
+      if (posts && posts.length > 0) {
+        tools = posts.map((p, i) => parseAPIPost(p, i));
+        apiSuccess = true;
+        setProgress(75);
+        setStatus('running', `API取得完了: ${tools.length}件。Geminiで詳細情報を補完中...`);
       }
-
-      // レート制限対策（最後のバッチ以外は待機）
-      if (i < totalBatches - 1) await sleep(1200);
+    } catch (apiErr) {
+      console.warn('WordPress API取得失敗（CORS等）:', apiErr.message);
+      setStatus('running', 'APIへの直接アクセス不可。Geminiで収集します...');
     }
 
-    setProgress(88);
+    // ── Step2: API失敗 or Geminiキーあり → Geminiで補完/収集 ──
+    if (!apiSuccess) {
+      if (!apiKey) {
+        throw new Error('Gemini APIキーを入力してください（WordPress APIへの直接アクセスが制限されています）');
+      }
+      setStatus('running', 'Gemini 2.5 で大量収集中... (全24カテゴリ)');
+      tools = await collectWithGemini(apiKey);
+    } else if (apiKey && tools.length > 0) {
+      // APIで取得できたがGeminiキーもある場合、概要・特徴を補完
+      tools = await enrichWithGemini(apiKey, tools);
+    }
 
-    // 重複除去・番号付け
+    setProgress(92);
+
+    if (tools.length === 0) {
+      setStatus('error', '⚠️ データを取得できませんでした。再試行してください。');
+      toast('error', 'データ取得失敗');
+      return;
+    }
+
+    // 重複除去・番号振り直し
     const seen = new Set();
-    tools = allResults.filter(t => {
+    tools = tools.filter(t => {
       const k = (t.name || '').toLowerCase().trim();
       if (!k || seen.has(k)) return false;
       seen.add(k); return true;
     }).map((t, i) => ({ ...t, no: i + 1 }));
 
-    setProgress(95);
-    if (tools.length === 0) {
-      setStatus('error', '⚠️ データ取得できませんでした。Gemini APIキーを確認して再試行してください。');
-      toast('error', 'データ取得失敗。コンソールを確認してください（F12）');
-    } else {
-      setStatus('done', `✅ 収集完了: ${tools.length} 件のAIツールを取得しました`);
-      toast('success', `${tools.length}件を収集しました`);
-    }
+    setProgress(98);
+    setStatus('done', `✅ 収集完了: ${tools.length}件のAIツールを取得しました`);
+    toast('success', `${tools.length}件を収集しました`);
 
     renderTable(); updateStats(); populateFilter();
     if (tools.length > 0 && accessToken) document.getElementById('btn-sync').disabled = false;
@@ -722,6 +746,107 @@ async function runScraping(autoSync) {
   } finally {
     setBtns(false);
     setProgress(0);
+  }
+}
+
+// Geminiで大量収集（APIアクセス不可時のフォールバック）
+const GEMINI_BATCHES = [
+  { cat: '画像生成', tools: 'Midjourney, DALL-E 3, Stable Diffusion, Leonardo.ai, Adobe Firefly, Krea AI, Recraft AI, Ideogram, Canva AI, Playground AI, Seaart AI, Tensor.Art, NightCafe, Dreamina, Fotor AI, Picsart AI, Remove.bg, Clipdrop, Photoroom, PicWish, Cutout.Pro, Lensa AI, FaceApp, Stable Cascade, Bing Image Creator, Deep Dream Generator, Craiyon, DreamStudio, Artbreeder, NightCafe Creator' },
+  { cat: '動画生成', tools: 'Runway, Sora, Kling, Luma Dream Machine, Pika Labs, HeyGen, Synthesia, D-ID, InVideo AI, Opus Clip, Wondershare Filmora AI, CapCut AI, Veed.io, Fliki, Pictory AI, Steve AI, Colossyan, DeepBrain AI, Captions, Wisecut, Munch, Vizard, Vrew, Descript, Stable Video Diffusion, VideoPoet, Gen-2, Make-A-Video, Phenaki, CogVideo' },
+  { cat: '音楽生成', tools: 'Suno, Udio, AIVA, Soundraw, Boomy, Loudly, Beatoven.ai, Riffusion, Splash Pro, Mubert, Musico, Amper Music, Humtap, Ecrett Music, Soundful, Waveformer, Melodrive, Jukedeck, Infinite Album, Brain.fm, Endel, Lifescore, Musia, AI Music, WavTool' },
+  { cat: '音声生成・テキスト読み上げ', tools: 'ElevenLabs, Murf, Resemble AI, Speechify, Play.ht, Descript, Adobe Podcast, Altered AI, Respeecher, Podcastle, Cleanvoice, Auphonic, Voice.ai, Kits.ai, Voicemod, WellSaid Labs, Replica Studios, Synthesys, Listnr, Typecast, Lovo, Speechelo, NaturalReader, Balabolka, ReadSpeaker' },
+  { cat: 'コーディング・開発', tools: 'GitHub Copilot, Cursor, Windsurf, Bolt.new, v0.dev, Replit AI, Tabnine, Codeium, Amazon CodeWhisperer, Devin, Aider, Continue.dev, Sourcegraph Cody, JetBrains AI, Blackbox AI, Phind, Warp AI, Mutable AI, Safurai, CodeT5, StarCoder, Codestral, Ghostwriter, AskCodi, CodePal, Bito, CodiumAI, Snyk AI, Swimm, CodeSee' },
+  { cat: '生成AI・LLM', tools: 'ChatGPT, Claude, Gemini, Grok, Llama, Mistral, Copilot, Pi, Character.AI, Poe, Hugging Chat, Cohere, Groq, DeepSeek, Qwen, Command R, Falcon, WizardLM, OpenChat, Phi, Vicuna, Alpaca, Dolly, StableLM, Zephyr, Orca, MPT, BLOOM, OPT, GPT4All' },
+  { cat: 'AI検索・リサーチ', tools: 'Perplexity AI, Felo, SearchGPT, You.com, Exa AI, Elicit, Consensus, Semantic Scholar, Research Rabbit, Undermind, Sourcely, Jenni AI, SciSpace, Explainpaper, Connected Papers, Scite, Litmaps, Keenious, Scholarcy, ChatPDF, Humata, PDF.ai, Bearly, Sharly AI, Bing AI, Google AI Overview' },
+  { cat: 'プレゼン・スライド・資料生成', tools: 'Gamma, Napkin AI, イルシル, Beautiful.ai, Tome, Pitch, Presentations.ai, SlidesAI, MagicSlides, Decktopus, Plus AI, Slidebean, PopAI, Storydoc, Visme AI, Simplified AI, Prezo, Sendsteps, Deckrobot, Designs.ai, Motionit.ai, ChatBA, Powerpresent AI, Kroma, Slidesgo AI' },
+  { cat: '文字起こし・議事録・要約', tools: 'Notta, Otter.ai, Fireflies.ai, Grain, Trint, Rev, Sonix, Whisper, AssemblyAI, Deepgram, Verbit, Transkriptor, Speak AI, MeetGeek, Avoma, Fathom, Sembly AI, Read AI, Tactiq, Krisp, Airgram, Fellow, Supernormal, tl;dv, Clover, Rewatch, Laxis, Vowel, Beey, TranscribeMe' },
+  { cat: '文章生成・ライティング', tools: 'Jasper, Copy.ai, Writesonic, Rytr, Anyword, Wordtune, QuillBot, Grammarly AI, ProWritingAid, Sudowrite, NovelAI, Hypotenuse AI, Copysmith, Scalenut, Frase, Longshot AI, Closers Copy, GrowthBar, Describely, Nichesss, Peppertype, Zyro AI, Ocoya, Kafkai, Article Forge, Writier, AI Writer, Cohesive, Copymatic, TextCortex' },
+  { cat: 'デザイン・ロゴ・画像編集', tools: 'Canva AI, Adobe Express AI, Looka, Brandmark, Tailor Brands, Designs.ai, Uizard, Framer AI, Durable, Wix ADI, Hostinger AI, 10Web, Khroma, Colormind, Coolors AI, Fontjoy, Magician (Figma), Visily, Diagram, Genius Design, Picsart AI, BeFunky AI, Pixlr AI, Fotor AI, PicMonkey AI' },
+  { cat: 'マーケティング・SEO・SNS', tools: 'Surfer SEO, Clearscope, MarketMuse, Semrush AI, Ahrefs AI, Neuron Writer, INK, Outranking, Alli AI, RankIQ, GrowthBar, Diib, Jasper AI, Persado, Phrasee, Smartly.io, Pencil, AdCreative.ai, Predis.ai, Lately, Ocoya, FeedHive, Taplio, Postwise, Tweet Hunter, Tribescaler, Flick, Audiense, Brandwatch AI, Sprout Social AI' },
+  { cat: 'ノーコード・自動化・ワークフロー', tools: 'Dify, Make, Zapier AI, n8n, Bubble AI, Glide AI, Adalo, Softr, Webflow AI, AppGyver, Retool AI, Stacker, Noloco, Bildr, Internal, Bravo Studio, Thunkable, FlutterFlow, Adalo, DronaHQ, UI Bakery, Forest Admin, Appsmith, Tooljet, Budibase' },
+  { cat: '業務効率化・プロジェクト管理', tools: 'Notion AI, Coda AI, Airtable AI, ClickUp AI, Monday AI, Asana AI, Motion, Reclaim AI, Clockwise, Trevor AI, Mem.ai, Obsidian AI, Roam Research, Reflect, Logseq, Taskade, Fibery AI, Height AI, Linear AI, Plane, AppFlowy, Capacities, Heptabase, Tana, Anytype' },
+  { cat: '翻訳・多言語', tools: 'DeepL, Google Translate AI, Papago, Reverso, Smartcat, Languagetool, Unbabel, Lilt, ModernMT, Systran, Transperfect AI, SDL Trados AI, Matecat, Phrase AI, Memsource AI, Crowdin AI, Lokalise AI, POEditor, Transifex AI, Weblate AI, OmegaT AI, Wordfast AI, Across, XTM Cloud, Metatexis' },
+  { cat: '教育・学習', tools: 'Duolingo AI, Khan Academy AI, Coursera AI, Khanmigo, Socratic, Photomath, Wolfram Alpha AI, Elsa Speak, Speak, Quizlet AI, Brainly AI, Chegg AI, Course Hero AI, Knowji, Memorize, Lingvist, Babbel AI, Rosetta Stone AI, Pimsleur AI, italki AI, Preply AI, Wyzant AI, Tutor.com AI, Skooli, Varsity Tutors AI' },
+  { cat: 'カスタマーサポート・チャットボット', tools: 'Intercom AI, Zendesk AI, Freshdesk AI, Drift, Tidio, Chatbase, Botpress, ManyChat, Landbot, Voiceflow, Dialogflow, Amazon Lex, Microsoft Bot Framework, Rasa, Yellow.ai, Haptik, Kore.ai, LivePerson AI, Genesys AI, Salesforce Einstein, HubSpot AI, Zoho AI, Freshworks AI, Help Scout AI, Gorgias AI' },
+  { cat: '営業・CRM・メール', tools: 'Salesforce Einstein, HubSpot AI, Outreach AI, Salesloft AI, Apollo.io AI, Lavender, Smartlead, Instantly AI, Reply.io, Lemlist, Mailchimp AI, ActiveCampaign AI, Klaviyo AI, Omnisend AI, Drip AI, ConvertKit AI, AWeber AI, GetResponse AI, Brevo AI, Moosend AI, EmailOctopus AI, Benchmark Email AI, Constant Contact AI, Campaign Monitor AI, Mailjet AI' },
+  { cat: 'データ分析・BI', tools: 'Tableau AI, Power BI AI, Looker AI, Sisense, ThoughtSpot, Domo AI, Qlik AI, MicroStrategy AI, IBM Watson Analytics, SAP Analytics Cloud, Oracle Analytics AI, Yellowfin AI, Klipfolio AI, Geckoboard AI, Databox AI, Julius AI, WolframAlpha, Obviously AI, MindsDB, DataRobot, H2O.ai, RapidMiner AI, KNIME AI, Alteryx AI, Databricks AI' },
+  { cat: '議事録・会議・コミュニケーション', tools: 'Zoom AI, Microsoft Teams AI, Google Meet AI, Slack AI, Loom AI, Mmhmm, Around, Grain, Fireflies.ai, Otter.ai, Krisp, NVIDIA RTX Voice, SpeechTexter, Sonix, Trint, Beey, Verbit, 3Play Media, Cielo24, Rev AI, Descript, Resemble AI, Podcastle, Riverside.fm, Squadcast' },
+  { cat: 'ヘルスケア・医療', tools: 'Ada Health, Babylon Health, K Health, Buoy Health, Infermedica, Mediktor, Symptoma, Isabel DDx, Navina, Suki AI, Nuance DAX, DeepScribe, Ambience Healthcare, Augmedix, Robin Healthcare, Notable Health, Olive AI, Viz.ai, Aidoc, Zebra Medical Vision, Enlitic, Arterys, Tempus AI, Paige AI, PathAI' },
+  { cat: 'セキュリティ・法務・その他', tools: 'Harvey AI, Casetext, Lexion, Ironclad AI, Kira Systems, Luminance, Litera, ThoughtTrace, eBrevia, Seal Software, Darktrace, CrowdStrike AI, SentinelOne AI, Vectra AI, Exabeam AI, Splunk AI, IBM QRadar AI, Microsoft Sentinel AI, Palo Alto AI, Cylance AI, Abnormal Security, GreatHorn, Tessian, Vade AI, Avanan AI' },
+  { cat: 'ECサイト・不動産・金融', tools: 'Shopify AI, WooCommerce AI, Magento AI, BigCommerce AI, Wix eCommerce AI, Squarespace AI, Weebly AI, Ecwid AI, Volusion AI, 3dcart AI, Zillow AI, Redfin AI, Realtor.com AI, Opendoor AI, Offerpad AI, Bloomberg AI, Reuters AI, Refinitiv AI, FactSet AI, Morningstar AI, Kensho, Two Sigma AI, Numerai, Quandl AI, Alpaca AI' },
+];
+
+async function collectWithGemini(apiKey) {
+  let allResults = [];
+  const total = GEMINI_BATCHES.length;
+
+  for (let i = 0; i < total; i++) {
+    const b = GEMINI_BATCHES[i];
+    setStatus('running', `Gemini収集中 ${i+1}/${total}：「${b.cat}」... (累計${allResults.length}件)`);
+    setProgress(10 + (i / total) * 80);
+
+    try {
+      const prompt = `以下のAIツールリストについて、JSON配列のみで回答してください。説明文・前置き・コードブロック記号は不要です。
+
+カテゴリ：${b.cat}
+対象ツール：${b.tools}
+
+[{"name":"ツール名","category":"${b.cat}","summary":"概要1〜2文（日本語）","features":"主な特徴1文（日本語）","free":"あり または なし","rating":整数1〜5,"usecase":"具体的な使用例（日本語）","url":"https://公式URL"}]
+
+JSONのみ返してください：`;
+
+      const text = await callGemini(apiKey, prompt);
+      const result = extractTools(text);
+      allResults = [...allResults, ...result];
+      console.log(`Geminiバッチ${i+1}(${b.cat}): ${result.length}件`);
+    } catch (e) {
+      console.warn(`バッチ${i+1}失敗:`, e.message);
+    }
+
+    if (i < total - 1) await sleep(800);
+  }
+  return allResults;
+}
+
+// Geminiで詳細情報を補完（API取得後）
+async function enrichWithGemini(apiKey, rawTools) {
+  // 概要が短いツールだけ補完（最大50件）
+  const needEnrich = rawTools.filter(t => !t.summary || t.summary.length < 20).slice(0, 50);
+  if (needEnrich.length === 0) return rawTools;
+
+  setStatus('running', `Geminiで${needEnrich.length}件の詳細情報を補完中...`);
+  const nameList = needEnrich.map(t => t.name).join(', ');
+
+  try {
+    const prompt = `以下のAIツールについて詳細情報をJSON配列で返してください。
+ツール名リスト: ${nameList}
+
+[{"name":"ツール名","summary":"概要1〜2文（日本語）","features":"主な特徴（日本語）","free":"あり または なし","rating":整数1〜5,"usecase":"具体的な使用例（日本語）"}]
+
+JSONのみ：`;
+
+    const text = await callGemini(apiKey, prompt);
+    const enriched = extractTools(text);
+
+    // マージ
+    const enrichMap = {};
+    enriched.forEach(e => { if (e.name) enrichMap[e.name.toLowerCase()] = e; });
+
+    return rawTools.map(t => {
+      const e = enrichMap[t.name?.toLowerCase()];
+      if (!e) return t;
+      return {
+        ...t,
+        summary: e.summary || t.summary,
+        features: e.features || t.features,
+        free: e.free || t.free,
+        rating: e.rating || t.rating,
+        usecase: e.usecase || t.usecase,
+      };
+    });
+  } catch (e) {
+    console.warn('Gemini補完失敗:', e.message);
+    return rawTools;
   }
 }
 
