@@ -142,6 +142,46 @@
   .free-no  { background: rgba(100,116,139,0.12); color: var(--text-muted); }
   .empty-row td { text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px; }
 
+  /* ── 取得進捗パネル ── */
+  .progress-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 24px; margin-bottom: 18px;
+  }
+  .progress-panel-title {
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;
+  }
+  .coverage-bar-wrap {
+    background: var(--surface2); border-radius: 8px; height: 28px;
+    overflow: hidden; position: relative; margin-bottom: 8px;
+  }
+  .coverage-bar {
+    height: 100%; border-radius: 8px;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    transition: width 0.6s ease;
+  }
+  .coverage-label {
+    position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; font-family: 'Space Mono', monospace;
+    color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+  .coverage-meta {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--text-muted); margin-bottom: 12px;
+    font-family: 'Space Mono', monospace;
+  }
+  .coverage-meta span { display: flex; align-items: center; gap: 4px; }
+  .stat-site-total { color: var(--warn); font-weight: 700; }
+  .stat-collected { color: var(--accent); font-weight: 700; }
+  .stat-remaining { color: var(--danger); font-weight: 700; }
+  .diff-badge {
+    display: inline-block; background: rgba(16,185,129,0.15);
+    color: var(--accent3); border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 6px; padding: 2px 8px; font-size: 10px;
+    font-family: 'Space Mono', monospace; font-weight: 700;
+  }
+
   /* ── 折りたたみパネル ── */
   .panel-toggle {
     display: flex; align-items: center; justify-content: space-between;
@@ -322,10 +362,11 @@
 
   <!-- Action Bar -->
   <div class="action-bar">
-    <button class="btn btn-primary" id="btn-scrape" onclick="runScraping(false)">🔍 データ収集のみ</button>
+    <button class="btn btn-primary" id="btn-scrape" onclick="runScraping(false)">🔍 収集（マージ）</button>
     <button class="btn btn-success" id="btn-sync" onclick="syncToSheets()" disabled>📊 Sheetsへ同期</button>
     <div class="divider"></div>
     <button class="btn btn-secondary" id="btn-auto" onclick="runScraping(true)">⚡ 収集 → 自動同期</button>
+    <button class="btn btn-secondary" id="btn-diff" onclick="runDiffScraping()">➕ 差分のみ追加</button>
     <div class="divider"></div>
     <button class="btn btn-danger" onclick="clearData()">🗑 クリア</button>
     <button class="btn btn-warn" onclick="resetSettings()">⚙️ 設定リセット</button>
@@ -340,6 +381,21 @@
       <span class="stext" id="stext">待機中 ── Gemini APIキーを入力して「収集 → 自動同期」を押してください</span>
     </div>
     <div class="prog-wrap" id="prog-wrap"><div class="prog-bar" id="prog-bar"></div></div>
+  </div>
+
+  <!-- 取得進捗パネル -->
+  <div class="progress-panel" id="progress-panel">
+    <div class="progress-panel-title">📊 収集進捗 — ai-gallery.jp</div>
+    <div class="coverage-bar-wrap">
+      <div class="coverage-bar" id="coverage-bar" style="width:0%"></div>
+      <div class="coverage-label" id="coverage-label">サイト全体数を取得中...</div>
+    </div>
+    <div class="coverage-meta">
+      <span>サイト全体: <span class="stat-site-total" id="site-total">—</span> 件</span>
+      <span>収集済み: <span class="stat-collected" id="collected-count">0</span> 件</span>
+      <span>未取得: <span class="stat-remaining" id="remaining-count">—</span> 件</span>
+      <span id="diff-badge-wrap"></span>
+    </div>
   </div>
 
   <!-- Stats -->
@@ -676,9 +732,13 @@ function parseAPIPost(post, index) {
 async function runScraping(autoSync) {
   const apiKey = document.getElementById('input-gemini-key').value.trim();
 
-  tools = []; renderTable(); updateStats();
+  // 既存データを保持（マージモード）
+  const prevTools = [...tools];
+  const prevCount = prevTools.length;
+  localStorage.setItem('ai-mgr-prev-count', prevCount);
+
   setBtns(true);
-  setStatus('running', 'ai-gallery.jp WordPress APIに接続中...');
+  setStatus('running', `ai-gallery.jp WordPress APIに接続中... (既存${prevCount}件を保持)`);
   setProgress(5);
 
   try {
@@ -719,17 +779,22 @@ async function runScraping(autoSync) {
       return;
     }
 
-    // 重複除去・番号振り直し
+    // 既存データとマージして重複除去
+    const mergedAll = [...prevTools, ...tools];
     const seen = new Set();
-    tools = tools.filter(t => {
+    tools = mergedAll.filter(t => {
       const k = (t.name || '').toLowerCase().trim();
       if (!k || seen.has(k)) return false;
       seen.add(k); return true;
     }).map((t, i) => ({ ...t, no: i + 1 }));
 
+    const newAdded = tools.length - prevCount;
     setProgress(98);
-    setStatus('done', `✅ 収集完了: ${tools.length}件のAIツールを取得しました`);
-    toast('success', `${tools.length}件を収集しました`);
+    setStatus('done', `✅ 収集完了: 合計${tools.length}件（今回+${newAdded}件追加）`);
+    toast('success', `合計${tools.length}件（+${newAdded}件新規追加）`);
+
+    // localStorageに保存
+    saveToolsToStorage();
 
     renderTable(); updateStats(); populateFilter();
     if (tools.length > 0 && accessToken) document.getElementById('btn-sync').disabled = false;
@@ -954,9 +1019,60 @@ function setBtns(disabled) {
   ['btn-scrape','btn-auto','btn-sync'].forEach(id => document.getElementById(id).disabled = disabled);
 }
 function updateStats() {
-  document.getElementById('stat-total').textContent = tools.length;
+  const total = tools.length;
+  document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-cats').textContent = new Set(tools.map(t => t.category).filter(Boolean)).size;
   document.getElementById('stat-free').textContent = tools.filter(t => t.free === 'あり').length;
+
+  // 進捗バー更新
+  const siteTotal = parseInt(localStorage.getItem('ai-mgr-site-total') || '0');
+  document.getElementById('collected-count').textContent = total;
+  if (siteTotal > 0) {
+    const pct = Math.min(100, Math.round((total / siteTotal) * 100));
+    const remaining = Math.max(0, siteTotal - total);
+    document.getElementById('coverage-bar').style.width = pct + '%';
+    document.getElementById('coverage-label').textContent = `${pct}% 取得済み (${total} / ${siteTotal}件)`;
+    document.getElementById('site-total').textContent = siteTotal.toLocaleString();
+    document.getElementById('remaining-count').textContent = remaining.toLocaleString();
+    // 前回からの増加数バッジ
+    const prev = parseInt(localStorage.getItem('ai-mgr-prev-count') || '0');
+    const diff = total - prev;
+    const badgeWrap = document.getElementById('diff-badge-wrap');
+    if (diff > 0) {
+      badgeWrap.innerHTML = `<span class="diff-badge">+${diff} 件追加</span>`;
+    }
+  } else {
+    document.getElementById('coverage-label').textContent = 'サイト全体数を取得中...';
+    document.getElementById('site-total').textContent = '—';
+    document.getElementById('remaining-count').textContent = '—';
+  }
+}
+
+// サイト全体数をREST APIで取得
+async function fetchSiteTotal() {
+  try {
+    const res = await fetch('https://ai-gallery.jp/wp-json/wp/v2/tools?per_page=1&page=1&status=publish');
+    if (res.ok) {
+      const total = parseInt(res.headers.get('X-WP-Total') || '0');
+      if (total > 0) {
+        localStorage.setItem('ai-mgr-site-total', total);
+        document.getElementById('site-total').textContent = total.toLocaleString();
+        document.getElementById('coverage-label').textContent = `0% 取得済み (0 / ${total}件)`;
+        document.getElementById('remaining-count').textContent = total.toLocaleString();
+        console.log('サイト全体数:', total);
+        updateStats();
+        return total;
+      }
+    }
+  } catch (e) {
+    console.warn('サイト全体数取得失敗:', e.message);
+  }
+  // CORS失敗時は既知の概算値を使用
+  const fallback = 600;
+  localStorage.setItem('ai-mgr-site-total', fallback);
+  document.getElementById('site-total').textContent = `約${fallback}+`;
+  document.getElementById('coverage-label').textContent = `0% 取得済み (0 / ${fallback}+件)`;
+  return fallback;
 }
 function populateFilter() {
   const cats = [...new Set(tools.map(t => t.category).filter(Boolean))].sort();
@@ -1014,12 +1130,16 @@ function sortBy(key) {
   renderTable();
 }
 function clearData() {
-  if (tools.length && !confirm('収集データを削除しますか？')) return;
-  tools = []; renderTable(); updateStats();
+  if (tools.length && !confirm('収集データを全て削除しますか？\n※サイト全体数の情報は残ります')) return;
+  tools = [];
+  localStorage.removeItem('ai-mgr-tools');
+  localStorage.removeItem('ai-mgr-prev-count');
+  renderTable(); updateStats();
   setStatus('idle', '待機中 ── データをクリアしました');
   document.getElementById('btn-sync').disabled = true;
   document.getElementById('stat-synced').textContent = '—';
   document.getElementById('f-cat').innerHTML = '<option value="">全カテゴリ</option>';
+  document.getElementById('diff-badge-wrap').innerHTML = '';
 }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1186,13 +1306,71 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 
 // 設定をlocalStorageに永続化
 window.addEventListener('load', () => {
+  // 設定復元
   const s = JSON.parse(localStorage.getItem('ai-mgr-cfg') || '{}');
   if (s.clientId)  document.getElementById('input-client-id').value = s.clientId;
   if (s.sheetId)   document.getElementById('input-sheet-id').value = s.sheetId;
   if (s.sheetName) document.getElementById('input-sheet-name').value = s.sheetName;
-  // ロード後に入力済みパネルを自動折りたたむ
+
+  // 収集済みデータ復元
+  try {
+    const saved = localStorage.getItem('ai-mgr-tools');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        tools = parsed;
+        renderTable(); updateStats(); populateFilter();
+        setStatus('done', `✅ 前回の収集データ ${tools.length}件 を復元しました`);
+        document.getElementById('btn-sync').disabled = !accessToken;
+      }
+    }
+  } catch (e) { console.warn('データ復元失敗:', e); }
+
+  // サイト全体数を取得
+  const cachedTotal = localStorage.getItem('ai-mgr-site-total');
+  if (cachedTotal) {
+    document.getElementById('site-total').textContent = parseInt(cachedTotal).toLocaleString();
+    updateStats();
+  }
+  fetchSiteTotal();
+
   setTimeout(autoCollapseIfFilled, 100);
 });
+
+// toolsをlocalStorageに保存
+function saveToolsToStorage() {
+  try {
+    localStorage.setItem('ai-mgr-tools', JSON.stringify(tools));
+  } catch (e) {
+    console.warn('localStorage容量超過:', e.message);
+    // 容量超過時は古いデータを削減して再試行
+    const slim = tools.map(t => ({
+      no: t.no, name: t.name, category: t.category,
+      summary: t.summary?.substring(0, 80) || '',
+      features: t.features?.substring(0, 60) || '',
+      free: t.free, rating: t.rating,
+      usecase: t.usecase?.substring(0, 80) || '',
+      url: t.url
+    }));
+    try { localStorage.setItem('ai-mgr-tools', JSON.stringify(slim)); } catch {}
+  }
+}
+
+// 差分のみ追加収集
+async function runDiffScraping() {
+  if (tools.length === 0) {
+    toast('warn', 'まず通常収集を実行してください');
+    return;
+  }
+  const siteTotal = parseInt(localStorage.getItem('ai-mgr-site-total') || '0');
+  const remaining = siteTotal > 0 ? siteTotal - tools.length : '不明';
+  if (!confirm(`現在 ${tools.length}件 収集済みです。\n未取得の差分（推定${remaining}件）を追加収集しますか？`)) return;
+
+  // 差分収集は既存データを保持したまま追記
+  const prevCount = tools.length;
+  localStorage.setItem('ai-mgr-prev-count', prevCount);
+  await runScraping(false);
+}
 ['input-client-id','input-sheet-id','input-sheet-name'].forEach(id => {
   document.getElementById(id).addEventListener('input', () => {
     localStorage.setItem('ai-mgr-cfg', JSON.stringify({
