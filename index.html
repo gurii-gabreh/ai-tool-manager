@@ -985,8 +985,7 @@ async function runPickup() {
     // 収集済みツールのリストをGeminiに渡す
     const toolList = tools.map(t =>
       `[${t.no}] ${t.name}（${t.category}）: ${t.summary} / 無料:${t.free} / ★${t.rating} / 使用例:${t.usecase}`
-    ).join('
-');
+    ).join('\n');
 
     const prompt = `あなたはAIツール選定の専門家です。
 
@@ -1012,7 +1011,7 @@ JSONのみ返してください：`;
 
     // JSON抽出
     let picks = [];
-    const clean = text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+    const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     const arrMatch = clean.match(/\[[\s\S]*\]/);
     if (arrMatch) {
       try { picks = JSON.parse(arrMatch[0]); } catch {}
