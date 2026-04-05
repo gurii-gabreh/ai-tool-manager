@@ -142,6 +142,74 @@
   .free-no  { background: rgba(100,116,139,0.12); color: var(--text-muted); }
   .empty-row td { text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px; }
 
+  /* ── 折りたたみパネル ── */
+  .panel-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; user-select: none; margin-bottom: 0;
+    padding: 2px 0;
+  }
+  .panel-toggle:hover .panel-title { color: var(--accent); }
+  .toggle-icon { font-size: 12px; color: var(--text-muted); transition: transform 0.25s; }
+  .toggle-icon.open { transform: rotate(180deg); }
+  .panel-body { overflow: hidden; transition: max-height 0.3s ease, opacity 0.3s; max-height: 600px; opacity: 1; margin-top: 14px; }
+  .panel-body.collapsed { max-height: 0; opacity: 0; margin-top: 0; }
+  .panel-saved-badge {
+    font-size: 10px; color: var(--accent3); font-family: 'Space Mono', monospace;
+    background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2);
+    border-radius: 10px; padding: 2px 8px; margin-left: 8px;
+  }
+
+  /* ── AIピックアップ ── */
+  .pickup-panel {
+    background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(0,212,255,0.05));
+    border: 1px solid rgba(124,58,237,0.25);
+    border-radius: 14px; padding: 22px 24px; margin-bottom: 18px;
+  }
+  .pickup-title {
+    font-size: 13px; font-weight: 700; color: var(--text);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .pickup-input-row {
+    display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; margin-bottom: 6px;
+  }
+  textarea#pickup-query {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); padding: 10px 14px;
+    font-size: 12px; font-family: 'Noto Sans JP', sans-serif;
+    outline: none; resize: vertical; min-height: 72px; width: 100%;
+    transition: border-color 0.2s; line-height: 1.6;
+  }
+  textarea#pickup-query:focus { border-color: var(--accent2); }
+  .pickup-hint { font-size: 10px; color: var(--text-muted); margin-bottom: 14px; }
+
+  .pickup-results { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .pickup-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+    display: grid; grid-template-columns: auto 1fr auto;
+    gap: 12px; align-items: start;
+    transition: border-color 0.2s;
+    animation: fadeIn 0.3s ease;
+  }
+  .pickup-card:hover { border-color: var(--accent2); }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+  .pickup-rank {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .pickup-card-body { min-width: 0; }
+  .pickup-name { font-weight: 700; color: var(--text); font-size: 13px; margin-bottom: 3px; }
+  .pickup-cat { font-size: 10px; color: var(--accent2); margin-bottom: 5px; }
+  .pickup-reason { font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+  .pickup-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+  .pickup-stars { color: var(--warn); font-size: 11px; }
+  .pickup-free { font-size: 9.5px; font-weight: 600; padding: 1px 6px; border-radius: 3px; }
+  .pickup-url { color: var(--accent); font-size: 10px; text-decoration: none; opacity: 0.7; }
+  .pickup-url:hover { opacity: 1; }
+  .pickup-empty { text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px; }
+
   .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
   .toast { padding: 10px 16px; border-radius: 8px; font-size: 12px; font-family: 'Space Mono', monospace; animation: slideIn 0.3s; max-width: 340px; }
   .toast-success { background: rgba(16,185,129,0.92); color: #fff; }
@@ -192,47 +260,63 @@
 
   <!-- Gemini設定 -->
   <div class="panel">
-    <div class="panel-title">🔮 Gemini API 設定（情報収集エンジン）</div>
-    <div class="apikey-row">
-      <div class="field">
-        <div class="field-label">Gemini API キー &nbsp;<span style="color:var(--accent3);font-size:10px">無料で取得可能</span></div>
-        <input type="password" id="input-gemini-key" placeholder="AIza..." />
+    <div class="panel-toggle" onclick="togglePanel('gemini-body', 'gemini-icon', 'gemini-badge')">
+      <div class="panel-title" style="margin-bottom:0">
+        🔮 Gemini API 設定（情報収集エンジン）
+        <span class="panel-saved-badge" id="gemini-badge" style="display:none">✓ 設定済み</span>
       </div>
-      <button class="btn btn-warn" onclick="showModal('modal-gemini-help')">🔑 キー取得方法</button>
+      <span class="toggle-icon open" id="gemini-icon">▼</span>
     </div>
-    <div class="field-label">使用モデル</div>
-    <div class="model-select-row">
-      <div class="model-chip active" data-model="gemini-2.5-flash" onclick="selectModel(this)">
-        gemini-2.5-flash ⚡ &nbsp;<span style="font-size:10px;opacity:0.7">推奨・無料500req/日</span>
+    <div class="panel-body" id="gemini-body">
+      <div class="apikey-row">
+        <div class="field">
+          <div class="field-label">Gemini API キー &nbsp;<span style="color:var(--accent3);font-size:10px">無料で取得可能</span></div>
+          <input type="password" id="input-gemini-key" placeholder="AIza..." />
+        </div>
+        <button class="btn btn-warn" onclick="showModal('modal-gemini-help')">🔑 キー取得方法</button>
       </div>
-      <div class="model-chip" data-model="gemini-2.5-pro" onclick="selectModel(this)">
-        gemini-2.5-pro 🧠 &nbsp;<span style="font-size:10px;opacity:0.7">高精度・無料25req/日</span>
+      <div class="field-label">使用モデル</div>
+      <div class="model-select-row">
+        <div class="model-chip active" data-model="gemini-2.5-flash" onclick="selectModel(this)">
+          gemini-2.5-flash ⚡ &nbsp;<span style="font-size:10px;opacity:0.7">推奨・無料500req/日</span>
+        </div>
+        <div class="model-chip" data-model="gemini-2.5-pro" onclick="selectModel(this)">
+          gemini-2.5-pro 🧠 &nbsp;<span style="font-size:10px;opacity:0.7">高精度・無料25req/日</span>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Sheets設定 -->
   <div class="panel">
-    <div class="panel-title">📊 Google Sheets 設定</div>
-    <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:12px;">
-      <div class="field">
-        <div class="field-label">Google OAuth2 クライアント ID &nbsp;<span style="color:var(--danger);font-size:10px">必須</span></div>
-        <input type="text" id="input-client-id" placeholder="000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com" />
-        <div class="field-hint">Google Cloud Console で取得したOAuth2クライアントID（ <code style="font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:3px;color:var(--accent)">〇〇〇.apps.googleusercontent.com</code> の形式）</div>
+    <div class="panel-toggle" onclick="togglePanel('sheets-body', 'sheets-icon', 'sheets-badge')">
+      <div class="panel-title" style="margin-bottom:0">
+        📊 Google Sheets 設定
+        <span class="panel-saved-badge" id="sheets-badge" style="display:none">✓ 設定済み</span>
       </div>
-      <button class="btn btn-warn" onclick="showModal('modal-sheets-help')" style="align-self:start;margin-top:22px">⚙️ 取得方法</button>
+      <span class="toggle-icon open" id="sheets-icon">▼</span>
     </div>
-    <div class="settings-grid">
-      <div class="field">
-        <div class="field-label">スプレッドシート ID</div>
-        <input type="text" id="input-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
-        <div class="field-hint">URLの /d/【ここ】/edit の部分</div>
+    <div class="panel-body" id="sheets-body">
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:12px;">
+        <div class="field">
+          <div class="field-label">Google OAuth2 クライアント ID &nbsp;<span style="color:var(--danger);font-size:10px">必須</span></div>
+          <input type="text" id="input-client-id" placeholder="000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com" />
+          <div class="field-hint">Google Cloud Console で取得したOAuth2クライアントID（ <code style="font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:3px;color:var(--accent)">〇〇〇.apps.googleusercontent.com</code> の形式）</div>
+        </div>
+        <button class="btn btn-warn" onclick="showModal('modal-sheets-help')" style="align-self:start;margin-top:22px">⚙️ 取得方法</button>
       </div>
-      <div class="field">
-        <div class="field-label">シート名（タブ名）</div>
-        <input type="text" id="input-sheet-name" value="AI情報一覧" />
+      <div class="settings-grid">
+        <div class="field">
+          <div class="field-label">スプレッドシート ID</div>
+          <input type="text" id="input-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
+          <div class="field-hint">URLの /d/【ここ】/edit の部分</div>
+        </div>
+        <div class="field">
+          <div class="field-label">シート名（タブ名）</div>
+          <input type="text" id="input-sheet-name" value="AI情報一覧" />
+        </div>
+        <div></div>
       </div>
-      <div></div>
     </div>
   </div>
 
@@ -264,6 +348,21 @@
     <div class="stat-card"><div class="stat-val" id="stat-cats">0</div><div class="stat-label">カテゴリ数</div></div>
     <div class="stat-card"><div class="stat-val" id="stat-free">0</div><div class="stat-label">無料枠あり</div></div>
     <div class="stat-card"><div class="stat-val" id="stat-synced" style="color:var(--accent3)">—</div><div class="stat-label">Sheets 同期数</div></div>
+  </div>
+
+  <!-- AIピックアップ -->
+  <div class="pickup-panel">
+    <div class="pickup-title">🎯 用途からAIをピックアップ</div>
+    <div class="pickup-input-row">
+      <div class="field">
+        <textarea id="pickup-query" placeholder="例：動画を自動で字幕付きで編集したい&#10;例：マーケティング用のSNS投稿文を大量生成したい&#10;例：Pythonのコードを自動補完してほしい"></textarea>
+      </div>
+      <button class="btn btn-primary" id="btn-pickup" onclick="runPickup()" style="align-self:end;height:44px">
+        🎯 AIを探す
+      </button>
+    </div>
+    <div class="pickup-hint">やりたいこと・課題・用途を入力すると、収集済みデータの中から最適なAIを3〜5件ピックアップします</div>
+    <div class="pickup-results" id="pickup-results"></div>
   </div>
 
   <!-- Filters -->
@@ -484,35 +583,76 @@ function extractTools(text) {
 }
 
 // バッチ収集
+// 全カテゴリ × 詳細ツールリスト（12バッチ）
+const BATCHES = [
+  {
+    cat: '画像生成',
+    examples: 'Midjourney, DALL-E 3, Stable Diffusion, Leonardo.ai, Adobe Firefly, Krea AI, Recraft AI, Ideogram, Canva AI, Bing Image Creator, Playground AI, Seaart AI, Tensor.Art, NightCafe, Dreamina, Fotor AI, Picsart AI, Remove.bg, Clipdrop, Photoroom, PicWish, Cutout.Pro, Magic Eraser, Lensa AI, FaceApp'
+  },
+  {
+    cat: '動画生成',
+    examples: 'Runway, Sora, Kling, Luma Dream Machine, Pika Labs, Stable Video Diffusion, HeyGen, Synthesia, D-ID, InVideo AI, Opus Clip, Descript, Wondershare Filmora AI, CapCut AI, Veed.io, Fliki, Pictory AI, Steve AI, Colossyan, DeepBrain AI, Captions, Wisecut, Munch, Vizard, Vrew'
+  },
+  {
+    cat: '音楽生成・音声',
+    examples: 'Suno, Udio, ElevenLabs, Murf, Descript, Adobe Podcast, Resemble AI, Speechify, Play.ht, AIVA, Soundraw, Boomy, Loudly, Beatoven.ai, Voicemod, Altered AI, Respeecher, Podcastle, Cleanvoice, Auphonic, Voice.ai, Kits.ai, Musicfy, Riffusion, Splash Pro'
+  },
+  {
+    cat: 'コーディング・開発',
+    examples: 'GitHub Copilot, Cursor, Windsurf, Bolt.new, v0.dev, Replit AI, Tabnine, Codeium, Amazon CodeWhisperer, Devin, Aider, Continue.dev, Sourcegraph Cody, Codestral, JetBrains AI, Blackbox AI, Phind, Pieces for Developers, Fig AI, Warp AI, Mutable AI, Safurai, CodeT5, StarCoder, WizardCoder'
+  },
+  {
+    cat: '生成AI・LLM',
+    examples: 'ChatGPT, Claude, Gemini, Grok, Llama, Mistral, Copilot, Perplexity AI, You.com, Pi, Character.AI, Poe, Hugging Chat, Cohere, Together AI, Replicate, Groq, DeepSeek, Qwen, Command R, Falcon, Vicuna, WizardLM, OpenChat, Phi'
+  },
+  {
+    cat: 'AI検索・リサーチ',
+    examples: 'Perplexity AI, Felo, SearchGPT, Bing AI, Google AI Overview, You.com, Exa AI, Elicit, Consensus, Semantic Scholar, Research Rabbit, Undermind, Sourcely, Jenni AI, SciSpace, Explainpaper, Connected Papers, Scite, Litmaps, Keenious, Paperdigest, Inciteful, Iris.ai, Scholarcy, ChatPDF'
+  },
+  {
+    cat: 'プレゼン・スライド・資料生成',
+    examples: 'Gamma, Napkin AI, イルシル, Beautiful.ai, Tome, Pitch, Presentations.ai, SlidesAI, MagicSlides, Decktopus, Plus AI, Kroma, Slidebean, Canva Presentations, PopAI, Storydoc, Visme AI, Simplified AI, Prezo, Sendsteps, Deckrobot, Designs.ai, Motionit.ai, ChatBA, Powerpresent AI'
+  },
+  {
+    cat: '文字起こし・議事録・要約',
+    examples: 'Notta, Otter.ai, Fireflies.ai, Grain, Trint, Rev, Sonix, Descript, Whisper, AssemblyAI, Deepgram, Verbit, Transkriptor, Speak AI, MeetGeek, Avoma, Fathom, Sembly AI, Read AI, Hugo, Tactiq, Krisp, Airgram, Fellow, Supernormal'
+  },
+  {
+    cat: '文章生成・ライティング',
+    examples: 'Jasper, Copy.ai, Writesonic, Rytr, Anyword, Wordtune, QuillBot, Grammarly AI, ProWritingAid, Hemingway AI, Sudowrite, NovelAI, Inkitt AI, Squibler, Shortly AI, Hypotenuse AI, Peppertype, Copysmith, Scalenut, Frase, Longshot AI, Closers Copy, Nichesss, Describely, GrowthBar'
+  },
+  {
+    cat: 'デザイン・マーケティング・SEO',
+    examples: 'Canva AI, Adobe Express AI, Looka, Brandmark, Tailor Brands, Designs.ai, Uizard, Framer AI, Durable, 10Web, Hostinger AI, Wix ADI, Surfer SEO, Clearscope, MarketMuse, Semrush AI, Ahrefs AI, Neuron Writer, INK, Outranking, Alli AI, Can I Rank, GrowthBar, Diib, RankIQ'
+  },
+  {
+    cat: 'ノーコード・自動化・業務効率化',
+    examples: 'Dify, Make, Zapier AI, n8n, Bubble AI, Glide AI, Adalo, AppGyver, Softr, Webflow AI, Notion AI, Coda AI, Airtable AI, ClickUp AI, Monday AI, Asana AI, Motion, Reclaim AI, Clockwise, Trevor AI, Mem.ai, Obsidian AI, Roam Research, Reflect, Logseq'
+  },
+  {
+    cat: '翻訳・教育・ヘルスケア・その他特化',
+    examples: 'DeepL, Google Translate AI, Papago, Reverso, Smartcat, Duolingo AI, Khan Academy AI, Coursera AI, Synthesis AI, Khanmigo, Socratic, Photomath, Wolfram Alpha AI, Elsa Speak, Speak, Ada Health, Babylon Health, K Health, Wysa, Woebot, DoNotPay, Harvey AI, Casetext, Latch, Runway ML'
+  }
+];
+
 async function fetchBatch(apiKey, batchNum) {
-  const batches = [
-    {
-      cats: '画像生成・動画生成・音楽生成・コーディング開発・AI検索・生成AI（LLM）・プレゼン資料・文字起こし',
-      examples: 'Midjourney, DALL-E 3, Stable Diffusion, Leonardo.ai, Runway, Sora, Kling, Luma Dream Machine, Suno, Udio, GitHub Copilot, Cursor, Windsurf, Bolt.new, v0.dev, Perplexity AI, Felo, ChatGPT, Claude, Gemini, Grok, Gamma, Napkin AI, イルシル, Notta'
-    },
-    {
-      cats: '文章生成・音声合成・デザイン・マーケティングSEO・データ分析・ノーコード自動化・翻訳要約・教育ヘルスケア',
-      examples: 'Jasper, Copy.ai, ElevenLabs, Murf, Canva AI, Adobe Firefly, Recraft AI, Krea AI, Surfer SEO, MarketMuse, Tableau AI, Julius, Dify, Make, Zapier AI, DeepL, Notion AI, Duolingo AI, Khan Academy AI, HeyGen, Synthesia'
-    }
-  ];
-  const b = batches[batchNum - 1];
+  const b = BATCHES[batchNum - 1];
+  const prompt = `日本のAIツール紹介サイト「AIツールギャラリー」に掲載されているAIツールを、以下のカテゴリ「${b.cat}」について回答してください。
 
-  const prompt = `以下のAIツールについて、JSON形式でデータを返してください。
+以下のツールを参考に、このカテゴリの実在するAIツールを20〜25件リストアップしてください：
+${b.examples}
 
-対象ツールの例: ${b.examples}
-カテゴリ群: ${b.cats}
+【絶対ルール】
+・回答はJSON配列のみ。説明文・前置き・コードブロック記号(\`\`\`)は一切含めない
+・実在するツールのみ（架空のツール禁止）
+・urlは実際の公式サイトURL
 
-上記の例を含め、各カテゴリから実在するAIツールを合計25〜35件選んでください。
+[{"name":"ツール名","category":"${b.cat}","summary":"概要1〜2文","features":"主な特徴1文","free":"あり または なし","rating":整数1〜5,"usecase":"具体的な使用例","url":"https://公式URL"}]
 
-【重要】回答はJSON配列のみ。説明文・前置き・コードブロック(\`\`\`)は絶対に含めないこと。
-
-[{"name":"ChatGPT","category":"生成AI","summary":"OpenAIが開発した高性能な対話型AIアシスタント。","features":"自然言語での質問応答・文章生成・コード作成に対応","free":"あり","rating":5,"usecase":"ビジネス文書の作成やプログラミングの補助","url":"https://chat.openai.com"},
-{"name":"Midjourney","category":"画像生成","summary":"テキストから高品質な画像を生成するAIツール。","features":"芸術的で高品質な画像生成が得意","free":"なし","rating":5,"usecase":"広告用ビジュアルやイラストの制作","url":"https://midjourney.com"}]
-
-上記の形式でJSONのみ返してください。`;
+JSONのみ返してください：`;
 
   const text = await callGemini(apiKey, prompt);
-  console.log('Gemini response batch' + batchNum + ':', text.substring(0, 200));
+  console.log(`バッチ${batchNum}(${b.cat}): ${text.substring(0, 100)}`);
   return extractTools(text);
 }
 
@@ -527,18 +667,32 @@ async function runScraping(autoSync) {
   setProgress(10);
 
   try {
-    setStatus('running', 'バッチ1/2：画像生成・動画・開発・LLM 系を収集中...');
-    setProgress(20);
-    const b1 = await fetchBatch(apiKey, 1);
-    setProgress(50);
+    const totalBatches = BATCHES.length;
+    let allResults = [];
 
-    setStatus('running', 'バッチ2/2：文章生成・デザイン・マーケ・自動化 系を収集中...');
-    const b2 = await fetchBatch(apiKey, 2);
-    setProgress(80);
+    for (let i = 0; i < totalBatches; i++) {
+      const batchNum = i + 1;
+      const cat = BATCHES[i].cat;
+      setStatus('running', `バッチ ${batchNum}/${totalBatches}：「${cat}」を収集中... (累計${allResults.length}件)`);
+      setProgress(10 + (i / totalBatches) * 75);
+
+      try {
+        const result = await fetchBatch(apiKey, batchNum);
+        allResults = [...allResults, ...result];
+        console.log(`バッチ${batchNum}完了: ${result.length}件取得（累計${allResults.length}件）`);
+      } catch (e) {
+        console.warn(`バッチ${batchNum}失敗:`, e.message);
+      }
+
+      // レート制限対策（最後のバッチ以外は待機）
+      if (i < totalBatches - 1) await sleep(1200);
+    }
+
+    setProgress(88);
 
     // 重複除去・番号付け
     const seen = new Set();
-    tools = [...b1, ...b2].filter(t => {
+    tools = allResults.filter(t => {
       const k = (t.name || '').toLowerCase().trim();
       if (!k || seen.has(k)) return false;
       seen.add(k); return true;
@@ -774,6 +928,133 @@ function toast(type, msg) {
   setTimeout(() => el.remove(), 4500);
 }
 function showModal(id) { document.getElementById(id).classList.add('open'); }
+
+// ── 折りたたみ ──
+function togglePanel(bodyId, iconId, badgeId) {
+  const body = document.getElementById(bodyId);
+  const icon = document.getElementById(iconId);
+  body.classList.toggle('collapsed');
+  icon.classList.toggle('open');
+}
+
+function autoCollapseIfFilled() {
+  // Geminiキーが入力済みなら折りたたむ
+  const geminiKey = document.getElementById('input-gemini-key').value.trim();
+  if (geminiKey) {
+    document.getElementById('gemini-body').classList.add('collapsed');
+    document.getElementById('gemini-icon').classList.remove('open');
+    document.getElementById('gemini-badge').style.display = 'inline';
+  }
+  // Sheets設定が入力済みなら折りたたむ
+  const clientId = document.getElementById('input-client-id').value.trim();
+  const sheetId  = document.getElementById('input-sheet-id').value.trim();
+  if (clientId && sheetId) {
+    document.getElementById('sheets-body').classList.add('collapsed');
+    document.getElementById('sheets-icon').classList.remove('open');
+    document.getElementById('sheets-badge').style.display = 'inline';
+  }
+}
+
+// 入力後に自動折りたたみ（フォーカスが外れたとき）
+['input-gemini-key','input-client-id','input-sheet-id','input-sheet-name'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('blur', autoCollapseIfFilled);
+});
+
+// ── AIピックアップ ──
+async function runPickup() {
+  const query = document.getElementById('pickup-query').value.trim();
+  if (!query) { toast('warn', 'やりたいことを入力してください'); return; }
+
+  const apiKey = document.getElementById('input-gemini-key').value.trim();
+  if (!apiKey) { toast('error', 'Gemini APIキーを入力してください'); return; }
+
+  if (tools.length === 0) {
+    toast('warn', 'まずデータを収集してください');
+    return;
+  }
+
+  const btn = document.getElementById('btn-pickup');
+  btn.disabled = true;
+  btn.textContent = '🔍 検索中...';
+
+  const resultsEl = document.getElementById('pickup-results');
+  resultsEl.innerHTML = '<div class="pickup-empty">AIを選定中...</div>';
+
+  try {
+    // 収集済みツールのリストをGeminiに渡す
+    const toolList = tools.map(t =>
+      `[${t.no}] ${t.name}（${t.category}）: ${t.summary} / 無料:${t.free} / ★${t.rating} / 使用例:${t.usecase}`
+    ).join('
+');
+
+    const prompt = `あなたはAIツール選定の専門家です。
+
+ユーザーの要望：
+「${query}」
+
+以下の収集済みAIツール一覧から、この要望に最も適したツールを3〜5件選んでください。
+
+【AIツール一覧】
+${toolList}
+
+【回答ルール】
+・JSON配列のみ返す。説明文・前置き・コードブロック記号は不要
+・必ず上記リストの中からのみ選ぶ（番号[N]で対応）
+・なぜその要望に適しているか「reason」に1〜2文で説明
+
+[{"no":番号,"name":"ツール名","category":"カテゴリ","reason":"この要望に適している理由"}]
+
+JSONのみ返してください：`;
+
+    const text = await callGemini(apiKey, prompt);
+    console.log('ピックアップ結果:', text.substring(0, 300));
+
+    // JSON抽出
+    let picks = [];
+    const clean = text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+    const arrMatch = clean.match(/\[[\s\S]*\]/);
+    if (arrMatch) {
+      try { picks = JSON.parse(arrMatch[0]); } catch {}
+    }
+
+    if (!picks || picks.length === 0) {
+      resultsEl.innerHTML = '<div class="pickup-empty">結果を取得できませんでした。再度お試しください。</div>';
+      return;
+    }
+
+    // ツールデータとマージして表示
+    resultsEl.innerHTML = picks.map((p, i) => {
+      const tool = tools.find(t => t.no === p.no || t.name === p.name) || {};
+      const r = Math.min(5, Math.max(0, parseInt(tool.rating) || 3));
+      const stars = '★'.repeat(r) + '☆'.repeat(5 - r);
+      return `<div class="pickup-card">
+        <div class="pickup-rank">${i + 1}</div>
+        <div class="pickup-card-body">
+          <div class="pickup-name">${esc(p.name || tool.name || '')}</div>
+          <div class="pickup-cat">${esc(p.category || tool.category || '')}</div>
+          <div class="pickup-reason">💡 ${esc(p.reason || '')}</div>
+          ${tool.summary ? `<div style="font-size:10px;color:var(--text-muted);margin-top:4px">${esc(tool.summary)}</div>` : ''}
+        </div>
+        <div class="pickup-meta">
+          <span class="pickup-stars">${stars}</span>
+          <span class="free-badge ${tool.free === 'あり' ? 'free-yes' : 'free-no'}">${tool.free === 'あり' ? '✓ 無料枠' : '有料'}</span>
+          ${tool.url ? `<a class="pickup-url" href="${esc(tool.url)}" target="_blank" rel="noopener">公式サイト →</a>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    toast('success', `${picks.length}件のAIをピックアップしました`);
+
+  } catch (e) {
+    console.error(e);
+    resultsEl.innerHTML = '<div class="pickup-empty">エラーが発生しました。再度お試しください。</div>';
+    toast('error', e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🎯 AIを探す';
+  }
+}
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
@@ -785,6 +1066,8 @@ window.addEventListener('load', () => {
   if (s.clientId)  document.getElementById('input-client-id').value = s.clientId;
   if (s.sheetId)   document.getElementById('input-sheet-id').value = s.sheetId;
   if (s.sheetName) document.getElementById('input-sheet-name').value = s.sheetName;
+  // ロード後に入力済みパネルを自動折りたたむ
+  setTimeout(autoCollapseIfFilled, 100);
 });
 ['input-client-id','input-sheet-id','input-sheet-name'].forEach(id => {
   document.getElementById(id).addEventListener('input', () => {
