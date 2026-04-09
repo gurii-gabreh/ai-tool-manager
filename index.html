@@ -694,36 +694,54 @@ async function fetchAllFromAPI() {
 }
 
 function parseAPIPost(post, index) {
-  const title = post.title?.rendered || '';
-  const excerpt = post.excerpt?.rendered?.replace(/<[^>]*>/g, '').trim() || '';
+  const title = (post.title?.rendered || '').replace(/&#[0-9]+;/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+  const excerpt = (post.excerpt?.rendered || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  const content = (post.content?.rendered || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
   const link = post.link || '';
   const acf = post.acf || {};
 
-  // カテゴリ取得
-  const cats = post['tool-category'] || [];
+  // カテゴリ取得（taxonomy termオブジェクトまたはslug）
+  const cats = post['tool-category'] || post['tool_category'] || [];
   let category = '未分類';
-  if (cats.length > 0 && typeof cats[0] === 'string') {
-    category = CAT_MAP[cats[0]] || cats[0];
+  if (cats.length > 0) {
+    const first = cats[0];
+    if (typeof first === 'string') category = CAT_MAP[first] || first;
+    else if (typeof first === 'object') category = CAT_MAP[first.slug] || first.name || '未分類';
   }
 
-  // 料金プラン判定
-  const plan = (acf.price_plan || acf.plan || '').toLowerCase();
-  const free = (plan.includes('free') || plan.includes('無料') || plan === 'completely-free' || plan === 'basic-free') ? 'あり' : 'なし';
+  // 料金プラン判定（複数フィールド名に対応）
+  const planRaw = acf.price_plan || acf.plan || acf.pricing || acf.free_plan || post.plan || '';
+  const plan = String(planRaw).toLowerCase();
+  const free = (plan.includes('free') || plan.includes('無料') || plan === 'completely-free' || plan === 'basic-free' || plan === 'freemium') ? 'あり' : 'なし';
 
-  // おすすめ度（ビュー数や評価から算出）
-  const views = parseInt(acf.views || acf.view_count || 0);
+  // おすすめ度
+  const views = parseInt(acf.views || acf.view_count || acf.page_views || 0);
   const rating = views > 10000 ? 5 : views > 5000 ? 4 : views > 1000 ? 3 : 3;
+
+  // 概要：excerpt → content冒頭 → ACFフィールド → 空
+  const summary = excerpt.substring(0, 150) ||
+                  (content.substring(0, 150)) ||
+                  acf.summary || acf.description || acf.overview || '';
+
+  // 特徴
+  const features = acf.features || acf.feature || acf.description ||
+                   (summary.substring(0, 80)) || '';
+
+  // 使用例
+  const usecase = acf.usecase || acf.use_case || acf.example ||
+                  acf.recommended_use || '';
 
   return {
     no: index + 1,
-    name: title.replace(/&#[0-9]+;/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'),
+    name: title,
     category,
-    summary: excerpt.substring(0, 120) || `${title}のAIツール`,
-    features: acf.features || acf.description || excerpt.substring(0, 60) || `${category}に特化したAIツール`,
+    summary,      // 空の場合はGemini補完対象
+    features,
     free,
     rating,
-    usecase: acf.usecase || acf.use_case || `${category}での活用`,
+    usecase,
     url: link,
+    needsEnrich: !summary || summary.length < 15, // Gemini補完フラグ
     updated: new Date().toLocaleDateString('ja-JP')
   };
 }
@@ -762,13 +780,27 @@ async function runScraping(autoSync) {
     // ── Step2: API失敗 or Geminiキーあり → Geminiで補完/収集 ──
     if (!apiSuccess) {
       if (!apiKey) {
-        throw new Error('Gemini APIキーを入力してください（WordPress APIへの直接アクセスが制限されています）');
+        throw new Error('データ取得にはGemini APIキーが必要です。「🔑 キー取得方法」から無料で取得できます。');
       }
       setStatus('running', 'Gemini 2.5 で大量収集中... (全24カテゴリ)');
       tools = await collectWithGemini(apiKey);
-    } else if (apiKey && tools.length > 0) {
-      // APIで取得できたがGeminiキーもある場合、概要・特徴を補完
-      tools = await enrichWithGemini(apiKey, tools);
+    } else if (tools.length > 0) {
+      // APIで取得できた場合、必ずGeminiで全フィールドを補完
+      if (apiKey) {
+        setStatus('running', `API取得完了(${tools.length}件)。Geminiで全ツールの詳細情報を補完中...`);
+        tools = await enrichWithGemini(apiKey, tools);
+      } else {
+        // Geminiキーなしの場合はデフォルト値を設定
+        tools = tools.map(t => ({
+          ...t,
+          summary: t.summary || `${t.name}は${t.category || 'AI'}分野のツールです。`,
+          features: t.features || `${t.category || 'AI'}に特化した機能を提供します。`,
+          usecase: t.usecase || `${t.category || 'AI'}での業務効率化`,
+          free: t.free || 'なし',
+          rating: t.rating || 3,
+        }));
+        toast('warn', 'Gemini APIキーを入力すると詳細情報（概要・特徴・使用例）が自動で補完されます');
+      }
     }
 
     setProgress(92);
@@ -851,14 +883,18 @@ async function collectWithGemini(apiKey) {
     setProgress(10 + (i / total) * 80);
 
     try {
-      const prompt = `以下のAIツールリストについて、JSON配列のみで回答してください。説明文・前置き・コードブロック記号は不要です。
-
-カテゴリ：${b.cat}
-対象ツール：${b.tools}
-
-[{"name":"ツール名","category":"${b.cat}","summary":"概要1〜2文（日本語）","features":"主な特徴1文（日本語）","free":"あり または なし","rating":整数1〜5,"usecase":"具体的な使用例（日本語）","url":"https://公式URL"}]
-
-JSONのみ返してください：`;
+      const sampleJson = '[{"name":"ツール名","category":"' + b.cat + '","summary":"2〜3文の詳しい概要","features":"具体的な主な特徴","free":"あり または なし","rating":5,"usecase":"具体的な使用シナリオ1文","url":"https://example.com"}]';
+      const prompt = 'あなたはAIツールの専門家です。以下のAIツールについてJSON配列のみで返してください。\n\n'
+        + 'カテゴリ：' + b.cat + '\n'
+        + '対象ツール：' + b.tools + '\n\n'
+        + '【各フィールドの要件】\n'
+        + '・summary: 何をするツールか・誰向けか・強みを含む2〜3文の詳しい日本語説明\n'
+        + '・features: 他ツールと差別化できる具体的な特徴を1〜2文で\n'
+        + '・usecase: したい人がするために使うという具体的シナリオ1文\n'
+        + '・free: 無料枠があればあり、完全有料ならなし\n'
+        + '・rating: 知名度・使いやすさ・機能性を総合した5段階評価\n\n'
+        + '説明文・前置き・コードブロック記号は一切含めないこと。\n\n'
+        + sampleJson + '\n\nJSONのみ：';
 
       const text = await callGemini(apiKey, prompt);
       const result = extractTools(text);
@@ -873,46 +909,87 @@ JSONのみ返してください：`;
   return allResults;
 }
 
-// Geminiで詳細情報を補完（API取得後）
+// Geminiで詳細情報を補完（全件強制・高品質版）
 async function enrichWithGemini(apiKey, rawTools) {
-  // 概要が短いツールだけ補完（最大50件）
-  const needEnrich = rawTools.filter(t => !t.summary || t.summary.length < 20).slice(0, 50);
-  if (needEnrich.length === 0) return rawTools;
+  if (rawTools.length === 0) return rawTools;
 
-  setStatus('running', `Geminiで${needEnrich.length}件の詳細情報を補完中...`);
-  const nameList = needEnrich.map(t => t.name).join(', ');
+  const BATCH_SIZE = 20; // 20件ずつ（トークン超過防止）
+  const totalBatches = Math.ceil(rawTools.length / BATCH_SIZE);
+  const enrichMap = {};
 
-  try {
-    const prompt = `以下のAIツールについて詳細情報をJSON配列で返してください。
-ツール名リスト: ${nameList}
+  console.log(`Gemini全件補完開始: ${rawTools.length}件 / ${totalBatches}バッチ`);
 
-[{"name":"ツール名","summary":"概要1〜2文（日本語）","features":"主な特徴（日本語）","free":"あり または なし","rating":整数1〜5,"usecase":"具体的な使用例（日本語）"}]
+  for (let i = 0; i < rawTools.length; i += BATCH_SIZE) {
+    const batch = rawTools.slice(i, i + BATCH_SIZE);
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+
+    setStatus('running', `詳細情報を補完中 ${batchNum}/${totalBatches}バッチ... (${i}/${rawTools.length}件完了)`);
+    setProgress(70 + (i / rawTools.length) * 25);
+
+    // ツール名とカテゴリをリスト化
+    const toolList = batch.map(t => t.name + '（' + (t.category || 'AIツール') + '）').join('\n');
+
+    try {
+      const prompt = `あなたはAIツールの専門家です。以下のAIツールについて、各ツールの詳細情報をJSON配列で返してください。
+
+【対象ツール】
+${toolList}
+
+【各フィールドの要件】
+・summary（概要）: そのツールが何をするものか、どんな人向けか、何が強みかを含む2〜3文の詳しい日本語説明
+・features（主な特徴）: 他のツールと差別化できる具体的な技術的特徴や機能を1〜2文で
+・free: 無料プランや無料枠があれば「あり」、完全有料なら「なし」
+・rating: 5段階評価（知名度・使いやすさ・機能性を総合）
+・usecase（一番特化した使用例）: 「〜したい人が〜するために使う」という具体的なシナリオを1文で
+・url: 公式サイトの正確なURL
+
+【絶対ルール】
+・JSON配列のみ返す。説明文・前置き・コードブロック記号()は一切含めない
+・nameは元のツール名と完全一致させる
+・全フィールドを必ず埋める（空文字禁止）
+
+[{"name":"元のツール名と完全一致","category":"カテゴリ（日本語）","summary":"2〜3文の詳しい概要","features":"具体的な主な特徴","free":"あり または なし","rating":整数1〜5,"usecase":"具体的な使用シナリオ1文","url":"https://公式URL"}]
 
 JSONのみ：`;
 
-    const text = await callGemini(apiKey, prompt);
-    const enriched = extractTools(text);
+      const text = await callGemini(apiKey, prompt);
+      const enriched = extractTools(text);
 
-    // マージ
-    const enrichMap = {};
-    enriched.forEach(e => { if (e.name) enrichMap[e.name.toLowerCase()] = e; });
+      enriched.forEach(e => {
+        if (e.name) {
+          // 元のツール名に近いキーでマッピング
+          enrichMap[e.name.toLowerCase().trim()] = e;
+          // 部分一致も登録
+          enrichMap[e.name.toLowerCase().replace(/\s+/g,'').trim()] = e;
+        }
+      });
 
-    return rawTools.map(t => {
-      const e = enrichMap[t.name?.toLowerCase()];
-      if (!e) return t;
-      return {
-        ...t,
-        summary: e.summary || t.summary,
-        features: e.features || t.features,
-        free: e.free || t.free,
-        rating: e.rating || t.rating,
-        usecase: e.usecase || t.usecase,
-      };
-    });
-  } catch (e) {
-    console.warn('Gemini補完失敗:', e.message);
-    return rawTools;
+      console.log(`補完バッチ${batchNum}: ${enriched.length}件取得`);
+    } catch (e) {
+      console.warn(`補完バッチ${batchNum}失敗:`, e.message);
+    }
+
+    if (i + BATCH_SIZE < rawTools.length) await sleep(1000);
   }
+
+  // 全ツールにマージ（Geminiの値で必ず上書き）
+  return rawTools.map(t => {
+    const key = (t.name || '').toLowerCase().trim();
+    const keyNoSpace = key.replace(/\s+/g, '');
+    const e = enrichMap[key] || enrichMap[keyNoSpace];
+    if (!e) return { ...t, needsEnrich: false };
+    return {
+      ...t,
+      category: (e.category && e.category.length > 0) ? e.category : t.category,
+      summary: (e.summary && e.summary.length > 10) ? e.summary : t.summary || `${t.name}のAIツールです。`,
+      features: (e.features && e.features.length > 5) ? e.features : t.features || `${t.category || 'AI'}に特化した機能を提供します。`,
+      free: e.free || t.free || 'なし',
+      rating: parseInt(e.rating) || t.rating || 3,
+      usecase: (e.usecase && e.usecase.length > 10) ? e.usecase : t.usecase || `${t.category || 'AI'}での活用`,
+      url: (e.url && e.url.startsWith('http')) ? e.url : t.url,
+      needsEnrich: false,
+    };
+  });
 }
 
 // Sheets同期
