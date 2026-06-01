@@ -268,6 +268,77 @@
   .modal-body li { margin-bottom: 6px; }
   .modal-body a { color: var(--accent); }
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* ── スケジュールパネル ── */
+  .schedule-panel {
+    background: linear-gradient(135deg, rgba(0,212,255,0.05), rgba(124,58,237,0.05));
+    border: 1px solid rgba(0,212,255,0.2); border-radius: 14px;
+    padding: 20px 24px; margin-bottom: 18px;
+  }
+  .schedule-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .schedule-title { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .schedule-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-family: 'Space Mono', monospace; font-weight: 700; }
+  .badge-on  { background: rgba(16,185,129,0.15); color: var(--accent3); border: 1px solid rgba(16,185,129,0.3); }
+  .badge-off { background: rgba(100,116,139,0.12); color: var(--text-muted); border: 1px solid var(--border); }
+  .badge-retry { background: rgba(245,158,11,0.15); color: var(--warn); border: 1px solid rgba(245,158,11,0.3); animation: blink 1.2s infinite; }
+
+  .schedule-grid { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: end; margin-bottom: 14px; }
+  @media(max-width:700px){ .schedule-grid{ grid-template-columns: 1fr 1fr; } }
+
+  .time-input-wrap { display: flex; align-items: center; gap: 6px; }
+  .time-input { width: 64px; text-align: center; font-size: 18px; font-family: 'Space Mono', monospace; font-weight: 700; }
+  .time-colon { font-size: 20px; font-weight: 700; color: var(--accent); }
+  .schedule-next { font-size: 11px; color: var(--text-muted); font-family: 'Space Mono', monospace; margin-top: 6px; }
+  .schedule-next span { color: var(--accent); }
+
+  /* ── 進捗ログパネル ── */
+  .log-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px 24px; margin-bottom: 18px;
+  }
+  .log-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .log-title { font-size: 13px; font-weight: 700; }
+  .log-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .log-tab { padding: 4px 12px; border-radius: 20px; font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--text-muted); transition: all 0.2s; font-family: 'Space Mono', monospace; }
+  .log-tab.active { background: rgba(0,212,255,0.12); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+  /* カテゴリ進捗グリッド */
+  .cat-progress-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 16px; }
+  .cat-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; transition: border-color 0.2s; }
+  .cat-item.done    { border-color: rgba(16,185,129,0.3); }
+  .cat-item.pending { border-color: rgba(100,116,139,0.2); }
+  .cat-item.error   { border-color: rgba(239,68,68,0.3); }
+  .cat-name { font-size: 11px; color: var(--text-dim); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat-status-icon { font-size: 14px; flex-shrink: 0; }
+  .cat-count { font-size: 10px; color: var(--text-muted); font-family: 'Space Mono', monospace; flex-shrink: 0; }
+
+  .progress-summary { display: flex; gap: 16px; margin-bottom: 14px; font-size: 11px; font-family: 'Space Mono', monospace; flex-wrap: wrap; }
+  .ps-done    { color: var(--accent3); }
+  .ps-pending { color: var(--warn); }
+  .ps-error   { color: var(--danger); }
+
+  /* ログテーブル */
+  .log-table-wrap { max-height: 320px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--border); }
+  .log-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .log-table th { background: var(--surface2); padding: 7px 10px; text-align: left; font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+  .log-table td { padding: 7px 10px; border-bottom: 1px solid rgba(30,45,69,0.4); color: var(--text-dim); vertical-align: top; }
+  .log-table tr:last-child td { border-bottom: none; }
+  .log-type { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 9.5px; font-weight: 700; font-family: 'Space Mono', monospace; white-space: nowrap; }
+  .lt-START,.lt-MANUAL    { background: rgba(0,212,255,0.12); color: var(--accent); }
+  .lt-COMPLETE,.lt-CAT_DONE,.lt-MANUAL_COMPLETE { background: rgba(16,185,129,0.12); color: var(--accent3); }
+  .lt-ERROR,.lt-CAT_ERROR,.lt-MANUAL_ERROR { background: rgba(239,68,68,0.12); color: var(--danger); }
+  .lt-RETRY,.lt-RETRY_START,.lt-MANUAL_RETRY { background: rgba(245,158,11,0.12); color: var(--warn); }
+  .lt-PAUSE,.lt-TIMEOUT,.lt-MANUAL_PAUSE { background: rgba(124,58,237,0.12); color: var(--accent2); }
+  .lt-SCHEDULE,.lt-SETUP,.lt-RESET,.lt-TRIGGER { background: rgba(100,116,139,0.12); color: var(--text-muted); }
+  .log-empty { text-align: center; color: var(--text-muted); padding: 24px; font-size: 12px; }
+
+  .toggle-switch { position: relative; display: inline-flex; align-items: center; cursor: pointer; gap: 8px; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle-track { width: 40px; height: 22px; background: var(--surface2); border: 1px solid var(--border); border-radius: 11px; transition: all 0.25s; }
+  .toggle-switch input:checked ~ .toggle-track { background: rgba(0,212,255,0.2); border-color: var(--accent); }
+  .toggle-thumb { position: absolute; left: 3px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; background: var(--text-muted); border-radius: 50%; transition: all 0.25s; }
+  .toggle-switch input:checked ~ .toggle-track .toggle-thumb { left: 21px; background: var(--accent); }
+  .toggle-label { font-size: 12px; color: var(--text-dim); user-select: none; }
 </style>
 </head>
 <body>
@@ -357,6 +428,93 @@
         </div>
         <div></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ⏰ スケジュール設定パネル -->
+  <div class="schedule-panel">
+    <div class="schedule-header">
+      <div class="schedule-title">
+        ⏰ 自動収集スケジュール（GAS連携）
+        <span class="schedule-badge badge-off" id="sched-badge">OFF</span>
+        <span class="schedule-badge badge-retry" id="retry-badge" style="display:none">🔄 リトライ待機中</span>
+      </div>
+      <button class="btn btn-secondary" onclick="refreshScheduleStatus()" style="font-size:11px;padding:6px 12px">🔃 状態を更新</button>
+    </div>
+
+    <!-- GAS URL入力 -->
+    <div class="field" style="margin-bottom:14px">
+      <div class="field-label">GAS Web App URL &nbsp;<span style="color:var(--danger);font-size:10px">必須</span></div>
+      <input type="text" id="input-gas-url" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec" style="font-size:11px" />
+      <div class="field-hint">GAS を「ウェブアプリとして導入」した際のURL（全員・匿名ユーザーにアクセス権限を付与してください）</div>
+    </div>
+
+    <!-- 時刻設定 -->
+    <div class="schedule-grid">
+      <div class="field">
+        <div class="field-label">実行時刻（JST）</div>
+        <div class="time-input-wrap">
+          <input type="number" class="time-input" id="sched-hour" value="3" min="0" max="23" />
+          <span class="time-colon">:</span>
+          <input type="number" class="time-input" id="sched-minute" value="0" min="0" max="59" step="5" />
+          <span style="font-size:11px;color:var(--text-muted);margin-left:4px">毎日</span>
+        </div>
+      </div>
+      <div class="field" style="justify-content:flex-end;padding-bottom:2px">
+        <label class="toggle-switch">
+          <input type="checkbox" id="sched-enabled" />
+          <div class="toggle-track"><div class="toggle-thumb"></div></div>
+          <span class="toggle-label">スケジュール有効</span>
+        </label>
+      </div>
+      <div></div>
+      <button class="btn btn-primary" id="btn-save-schedule" onclick="saveSchedule()" style="white-space:nowrap">💾 設定を保存</button>
+    </div>
+    <div class="schedule-next" id="sched-next-run">次回実行: —</div>
+  </div>
+
+  <!-- 📋 収集ログ＆進捗パネル -->
+  <div class="log-panel">
+    <div class="log-header">
+      <div class="log-title">📋 収集ログ＆カテゴリ進捗</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-warn" id="btn-run-incomplete" onclick="runIncomplete()" style="font-size:11px;padding:7px 14px">
+          ▶️ 未完了を手動実行
+        </button>
+        <button class="btn btn-secondary" onclick="resetProgressData()" style="font-size:11px;padding:7px 12px">🔄 進捗リセット</button>
+        <button class="btn btn-secondary" onclick="refreshLogs()" style="font-size:11px;padding:7px 12px">🔃 更新</button>
+      </div>
+    </div>
+
+    <!-- カテゴリ別進捗 -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">カテゴリ別 収集状況</div>
+      <div class="progress-summary">
+        <span class="ps-done">✅ 完了: <span id="ps-done">—</span></span>
+        <span class="ps-pending">⏳ 未取得: <span id="ps-pending">—</span></span>
+        <span class="ps-error">❌ エラー: <span id="ps-error">—</span></span>
+      </div>
+      <div class="cat-progress-grid" id="cat-progress-grid">
+        <div style="color:var(--text-muted);font-size:11px;padding:8px">GAS URLを設定して「状態を更新」を押してください</div>
+      </div>
+    </div>
+
+    <!-- ログ日付タブ -->
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px">実行ログ</div>
+    <div class="log-tabs" id="log-date-tabs" style="margin-bottom:10px">
+      <div class="log-tab active" data-date="" onclick="selectLogDate(this,'')">すべて</div>
+    </div>
+    <div class="log-table-wrap">
+      <table class="log-table">
+        <thead><tr>
+          <th style="width:140px">日時</th>
+          <th style="width:110px">タイプ</th>
+          <th>メッセージ</th>
+        </tr></thead>
+        <tbody id="log-tbody">
+          <tr><td colspan="3" class="log-empty">GAS URLを設定してログを取得してください</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -1381,39 +1539,6 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
 });
 
-// 設定をlocalStorageに永続化
-window.addEventListener('load', () => {
-  // 設定復元
-  const s = JSON.parse(localStorage.getItem('ai-mgr-cfg') || '{}');
-  if (s.clientId)  document.getElementById('input-client-id').value = s.clientId;
-  if (s.sheetId)   document.getElementById('input-sheet-id').value = s.sheetId;
-  if (s.sheetName) document.getElementById('input-sheet-name').value = s.sheetName;
-
-  // 収集済みデータ復元
-  try {
-    const saved = localStorage.getItem('ai-mgr-tools');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        tools = parsed;
-        renderTable(); updateStats(); populateFilter();
-        setStatus('done', `✅ 前回の収集データ ${tools.length}件 を復元しました`);
-        document.getElementById('btn-sync').disabled = !accessToken;
-      }
-    }
-  } catch (e) { console.warn('データ復元失敗:', e); }
-
-  // サイト全体数を取得
-  const cachedTotal = localStorage.getItem('ai-mgr-site-total');
-  if (cachedTotal) {
-    document.getElementById('site-total').textContent = parseInt(cachedTotal).toLocaleString();
-    updateStats();
-  }
-  fetchSiteTotal();
-
-  setTimeout(autoCollapseIfFilled, 100);
-});
-
 // toolsをlocalStorageに保存
 function saveToolsToStorage() {
   try {
@@ -1448,14 +1573,286 @@ async function runDiffScraping() {
   localStorage.setItem('ai-mgr-prev-count', prevCount);
   await runScraping(false);
 }
+// Sheets設定入力時にlocalStorageへ保存
 ['input-client-id','input-sheet-id','input-sheet-name'].forEach(id => {
-  document.getElementById(id).addEventListener('input', () => {
-    localStorage.setItem('ai-mgr-cfg', JSON.stringify({
-      clientId:  document.getElementById('input-client-id').value,
-      sheetId:   document.getElementById('input-sheet-id').value,
-      sheetName: document.getElementById('input-sheet-name').value
-    }));
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', () => {
+    const cfg = JSON.parse(localStorage.getItem('ai-mgr-cfg') || '{}');
+    cfg.clientId  = document.getElementById('input-client-id').value;
+    cfg.sheetId   = document.getElementById('input-sheet-id').value;
+    cfg.sheetName = document.getElementById('input-sheet-name').value;
+    localStorage.setItem('ai-mgr-cfg', JSON.stringify(cfg));
   });
+});
+
+// ============================================================
+//  ⏰ スケジュール管理（GAS連携）
+// ============================================================
+
+function getGasUrl() {
+  return document.getElementById('input-gas-url').value.trim();
+}
+
+// GAS APIを呼び出すユーティリティ
+async function callGasApi(action, extraParams = {}) {
+  const url = getGasUrl();
+  if (!url) throw new Error('GAS Web App URLを入力してください');
+
+  const params = new URLSearchParams({ action, ...extraParams });
+  const res = await fetch(`${url}?${params}`, { method: 'GET' });
+  if (!res.ok) throw new Error(`GAS API エラー: ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'GAS APIエラー');
+  return data;
+}
+
+async function callGasPost(action, body = {}) {
+  const url = getGasUrl();
+  if (!url) throw new Error('GAS Web App URLを入力してください');
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...body })
+  });
+  if (!res.ok) throw new Error(`GAS API エラー: ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'GAS APIエラー');
+  return data;
+}
+
+// スケジュール設定を保存
+async function saveSchedule() {
+  const url = getGasUrl();
+  if (!url) { toast('error', 'GAS Web App URLを入力してください'); return; }
+
+  const hour    = parseInt(document.getElementById('sched-hour').value) || 0;
+  const minute  = parseInt(document.getElementById('sched-minute').value) || 0;
+  const enabled = document.getElementById('sched-enabled').checked;
+
+  const btn = document.getElementById('btn-save-schedule');
+  btn.disabled = true; btn.textContent = '保存中...';
+
+  try {
+    const data = await callGasPost('setSchedule', { hour, minute, enabled });
+    toast('success', `スケジュール${enabled ? hour + ':' + String(minute).padStart(2,'0') + ' に設定' : 'を無効化'}しました`);
+    // 設定をlocalStorageにも保存
+    const cfg = JSON.parse(localStorage.getItem('ai-mgr-cfg') || '{}');
+    cfg.gasUrl = url; cfg.schedHour = hour; cfg.schedMinute = minute; cfg.schedEnabled = enabled;
+    localStorage.setItem('ai-mgr-cfg', JSON.stringify(cfg));
+    await refreshScheduleStatus();
+  } catch (e) {
+    toast('error', e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 設定を保存';
+  }
+}
+
+// スケジュール状態を更新
+async function refreshScheduleStatus() {
+  const url = getGasUrl();
+  if (!url) return;
+
+  try {
+    const data = await callGasApi('getStatus');
+
+    // バッジ更新
+    const badge = document.getElementById('sched-badge');
+    const retryBadge = document.getElementById('retry-badge');
+    const sched = data.schedule || {};
+
+    if (sched.enabled) {
+      badge.textContent = `ON — 毎日 ${String(sched.hour).padStart(2,'0')}:${String(sched.minute).padStart(2,'0')} JST`;
+      badge.className = 'schedule-badge badge-on';
+    } else {
+      badge.textContent = 'OFF';
+      badge.className = 'schedule-badge badge-off';
+    }
+
+    retryBadge.style.display = data.hasRetryTrigger ? 'inline-block' : 'none';
+
+    // 次回実行
+    const nextEl = document.getElementById('sched-next-run');
+    if (sched.nextRun) {
+      nextEl.innerHTML = `次回実行: <span>${sched.nextRun} JST</span>`;
+    } else {
+      nextEl.innerHTML = '次回実行: <span style="color:var(--text-muted)">スケジュール無効</span>';
+    }
+
+    // 進捗更新
+    if (data.progress) renderCatProgress(data.progress);
+
+    // フォームに現在設定を反映
+    if (sched.hour !== undefined) {
+      document.getElementById('sched-hour').value = sched.hour;
+      document.getElementById('sched-minute').value = sched.minute;
+      document.getElementById('sched-enabled').checked = sched.enabled;
+    }
+
+    // ログも更新
+    await refreshLogs();
+
+  } catch (e) {
+    toast('error', '状態取得失敗: ' + e.message);
+  }
+}
+
+// カテゴリ進捗を描画
+function renderCatProgress(progressData) {
+  const prog = progressData.progress || [];
+  const done    = progressData.done    || 0;
+  const pending = progressData.pending || 0;
+  const error   = progressData.error   || 0;
+
+  document.getElementById('ps-done').textContent    = done;
+  document.getElementById('ps-pending').textContent = pending;
+  document.getElementById('ps-error').textContent   = error;
+
+  const grid = document.getElementById('cat-progress-grid');
+  if (prog.length === 0) {
+    grid.innerHTML = '<div style="color:var(--text-muted);font-size:11px;padding:8px">進捗データなし</div>';
+    return;
+  }
+
+  grid.innerHTML = prog.map(p => {
+    const isDone    = p.status === 'DONE';
+    const isError   = p.status === 'ERROR';
+    const isPending = !isDone && !isError;
+    const icon = isDone ? '✅' : isError ? '❌' : '⏳';
+    const cls  = isDone ? 'done' : isError ? 'error' : 'pending';
+    return `<div class="cat-item ${cls}" title="${p.updated || '未実行'}">
+      <span class="cat-status-icon">${icon}</span>
+      <span class="cat-name">${esc(p.category)}</span>
+      <span class="cat-count">${p.count > 0 ? p.count + '件' : ''}</span>
+    </div>`;
+  }).join('');
+}
+
+// ログを取得・表示
+let currentLogDate = '';
+async function refreshLogs(dateFilter) {
+  const url = getGasUrl();
+  if (!url) return;
+
+  if (dateFilter !== undefined) currentLogDate = dateFilter;
+
+  try {
+    const data = await callGasApi('getLogs', { date: currentLogDate });
+    renderLogs(data.logs || [], data.dates || []);
+  } catch (e) {
+    console.warn('ログ取得失敗:', e.message);
+  }
+}
+
+function renderLogs(logs, dates) {
+  // 日付タブ更新
+  const tabsEl = document.getElementById('log-date-tabs');
+  const allDates = [...new Set(dates)].sort().reverse();
+  tabsEl.innerHTML = `<div class="log-tab ${currentLogDate === '' ? 'active' : ''}" data-date="" onclick="selectLogDate(this,'')">すべて</div>`
+    + allDates.map(d => `<div class="log-tab ${currentLogDate === d ? 'active' : ''}" data-date="${d}" onclick="selectLogDate(this,'${d}')">${d}</div>`).join('');
+
+  // ログテーブル更新
+  const tbody = document.getElementById('log-tbody');
+  if (logs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="log-empty">ログデータなし</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = logs.map(l => {
+    const typeClass = 'lt-' + (l.type || 'OTHER').replace(/[^A-Z_]/g, '');
+    return `<tr>
+      <td style="font-family:'Space Mono',monospace;font-size:10px;white-space:nowrap;color:var(--text-muted)">${esc(l.datetime)}</td>
+      <td><span class="log-type ${typeClass}">${esc(l.type)}</span></td>
+      <td style="color:var(--text-dim)">${esc(l.message)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function selectLogDate(el, date) {
+  document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  refreshLogs(date);
+}
+
+// 未完了カテゴリを手動実行
+async function runIncomplete() {
+  const url = getGasUrl();
+  if (!url) { toast('error', 'GAS Web App URLを入力してください'); return; }
+
+  const btn = document.getElementById('btn-run-incomplete');
+  btn.disabled = true; btn.textContent = '⏳ 実行中...';
+
+  try {
+    toast('info', '未完了カテゴリの収集を開始します（GAS側で処理中）');
+    const data = await callGasApi('runIncomplete');
+    toast('success', data.message || '実行を開始しました');
+    // 少し待ってから状態更新
+    setTimeout(refreshScheduleStatus, 3000);
+  } catch (e) {
+    toast('error', '実行失敗: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '▶️ 未完了を手動実行';
+  }
+}
+
+// 進捗リセット
+async function resetProgressData() {
+  if (!confirm('カテゴリ進捗をリセットしますか？\n（全カテゴリを「未取得」に戻します。次回実行時に全件再収集されます）')) return;
+  const url = getGasUrl();
+  if (!url) { toast('error', 'GAS Web App URLを入力してください'); return; }
+
+  try {
+    await callGasApi('resetProgress');
+    toast('success', '進捗をリセットしました');
+    await refreshScheduleStatus();
+  } catch (e) {
+    toast('error', 'リセット失敗: ' + e.message);
+  }
+}
+
+// ページ読み込み時にGAS URLとスケジュール設定を復元
+window.addEventListener('load', () => {
+  const s = JSON.parse(localStorage.getItem('ai-mgr-cfg') || '{}');
+  if (s.clientId)  document.getElementById('input-client-id').value = s.clientId;
+  if (s.sheetId)   document.getElementById('input-sheet-id').value = s.sheetId;
+  if (s.sheetName) document.getElementById('input-sheet-name').value = s.sheetName;
+  if (s.gasUrl) {
+    document.getElementById('input-gas-url').value = s.gasUrl;
+    // GAS URLがあれば自動で状態を取得
+    setTimeout(refreshScheduleStatus, 500);
+  }
+  if (s.schedHour !== undefined)    document.getElementById('sched-hour').value = s.schedHour;
+  if (s.schedMinute !== undefined)  document.getElementById('sched-minute').value = s.schedMinute;
+  if (s.schedEnabled !== undefined) document.getElementById('sched-enabled').checked = s.schedEnabled;
+
+  // 収集済みデータ復元
+  try {
+    const saved = localStorage.getItem('ai-mgr-tools');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        tools = parsed;
+        renderTable(); updateStats(); populateFilter();
+        setStatus('done', `✅ 前回の収集データ ${tools.length}件 を復元しました`);
+        document.getElementById('btn-sync').disabled = !accessToken;
+      }
+    }
+  } catch (e) { console.warn('データ復元失敗:', e); }
+
+  const cachedTotal = localStorage.getItem('ai-mgr-site-total');
+  if (cachedTotal) {
+    document.getElementById('site-total').textContent = parseInt(cachedTotal).toLocaleString();
+    updateStats();
+  }
+  fetchSiteTotal();
+  setTimeout(autoCollapseIfFilled, 100);
+});
+
+// GAS URL入力時にlocalStorageへ保存
+document.getElementById('input-gas-url').addEventListener('input', () => {
+  const cfg = JSON.parse(localStorage.getItem('ai-mgr-cfg') || '{}');
+  cfg.gasUrl = document.getElementById('input-gas-url').value;
+  localStorage.setItem('ai-mgr-cfg', JSON.stringify(cfg));
 });
 </script>
 </body>
