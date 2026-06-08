@@ -1606,20 +1606,7 @@ async function callGasApi(action, extraParams = {}) {
   return data;
 }
 
-async function callGasPost(action, body = {}) {
-  const url = getGasUrl();
-  if (!url) throw new Error('GAS Web App URLを入力してください');
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, ...body })
-  });
-  if (!res.ok) throw new Error(`GAS API エラー: ${res.status}`);
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'GAS APIエラー');
-  return data;
-}
+// POST→GET統一済み（callGasApiに一本化）
 
 // スケジュール設定を保存
 async function saveSchedule() {
@@ -1634,7 +1621,7 @@ async function saveSchedule() {
   btn.disabled = true; btn.textContent = '保存中...';
 
   try {
-    const data = await callGasPost('setSchedule', { hour, minute, enabled });
+    const data = await callGasApi('setSchedule', { hour, minute, enabled });
     toast('success', `スケジュール${enabled ? hour + ':' + String(minute).padStart(2,'0') + ' に設定' : 'を無効化'}しました`);
     // 設定をlocalStorageにも保存
     const cfg = JSON.parse(localStorage.getItem('ai-mgr-cfg') || '{}');
