@@ -1878,40 +1878,42 @@ function parseGeminiResponse(text, batch) {
   }
 }
 
-// GAS経由でSheetsに保存
+// GAS経由でSheetsに保存（1件ずつ送信）
 async function saveItemsToGas(items, gasUrl) {
   const today = new Date().toISOString().substring(0, 10).replace(/-/g, '/');
   let added = 0;
 
-  // 10件ずつGASに送信（GETパラメーターの長さ制限対策）
-  const chunkSize = 10;
-  for (let i = 0; i < items.length; i += chunkSize) {
-    const chunk = items.slice(i, i + chunkSize);
-    const rows = chunk.map((item, idx) => {
-      const rating = '★'.repeat(Math.min(5, Math.max(1, item.rating)));
-      return [
-        '',  // No（GAS側で採番）
-        item.name,
-        item.category,
-        item.summary,
-        item.features,
-        item.free,
-        rating,
-        item.usecase,
-        item.url,
-        item.updated || today,
-      ].join('||');
-    });
+  for (const item of items) {
+    const rating = '★'.repeat(Math.min(5, Math.max(1, parseInt(item.rating) || 3)));
+    const row = [
+      '',                      // No（GAS側で採番）
+      item.name       || '',
+      item.category   || '',
+      item.summary    || '',
+      item.features   || '',
+      item.free       || '不明',
+      rating,
+      item.usecase    || '',
+      item.url        || '',
+      item.updated    || today,
+    ].join('||');
 
-    const params = new URLSearchParams({
-      action: 'appendRows',
-      rows: rows.join('$$'),
-    });
+    try {
+      const params = new URLSearchParams({
+        action: 'appendRows',
+        rows: row,
+      });
 
-    const res = await fetch(`${gasUrl}?${params}`);
-    const data = await res.json();
-    if (data.ok) added += data.added || chunk.length;
+      const res = await fetch(`${gasUrl}?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok) added += data.added || 1;
+      }
+    } catch(e) {
+      console.warn('1件保存失敗:', item.name, e.message);
+    }
 
+    // GAS負荷軽減のため少し待機
     await new Promise(r => setTimeout(r, 200));
   }
   return added;
