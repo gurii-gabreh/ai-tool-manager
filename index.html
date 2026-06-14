@@ -519,6 +519,24 @@
   </div>
 
   <!-- Action Bar -->
+  <!-- 🤖 Gemini手動収集パネル -->
+  <div class="schedule-panel" style="margin-bottom:18px">
+    <div class="schedule-header">
+      <div class="schedule-title">🤖 AI全件収集（Gemini手動貼り付け方式）</div>
+      <span id="manual-collect-badge" class="schedule-badge badge-off">待機中</span>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);margin-bottom:14px">
+      ai-gallery.jpから538件を取得し、100件ずつプロンプトを生成します。<br>
+      Geminiに貼り付けて回答を取得→貼り付け→Sheetsに保存を6回繰り返します。
+    </p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-primary" id="btn-manual-collect" onclick="startManualCollect()" style="font-size:12px;padding:10px 20px">
+        🚀 収集を開始する
+      </button>
+      <span id="manual-collect-progress" style="font-size:11px;color:var(--text-muted);font-family:'Space Mono',monospace"></span>
+    </div>
+  </div>
+
   <div class="action-bar">
     <button class="btn btn-primary" id="btn-scrape" onclick="runScraping(false)">🔍 収集（マージ）</button>
     <button class="btn btn-success" id="btn-sync" onclick="syncToSheets()" disabled>📊 Sheetsへ同期</button>
@@ -1586,6 +1604,331 @@ async function runDiffScraping() {
 });
 
 // ============================================================
+//  🤖 Gemini手動収集（プロンプト生成 → 手動貼り付け → Sheets保存）
+// ============================================================
+
+const COLLECT_BATCH_SIZE = 100;
+let collectState = {
+  tools: [],        // 全538件
+  batches: [],      // 100件ずつ分割
+  currentBatch: 0,  // 現在のバッチ番号（0始まり）
+  totalAdded: 0,    // 合計保存件数
+};
+
+// ① 収集開始：ai-gallery.jpから全件取得
+async function startManualCollect() {
+  const btn = document.getElementById('btn-manual-collect');
+  const badge = document.getElementById('manual-collect-badge');
+  const progress = document.getElementById('manual-collect-progress');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ ツール情報取得中...';
+  badge.textContent = '取得中';
+  badge.className = 'schedule-badge badge-retry';
+  progress.textContent = 'ai-gallery.jpから取得中...';
+
+  try {
+    const tools = await fetchAllToolsFromSite();
+    if (!tools || tools.length === 0) {
+      toast('error', 'ツール情報の取得に失敗しました');
+      resetCollectUI();
+      return;
+    }
+
+    // 100件ずつ分割
+    collectState.tools = tools;
+    collectState.batches = [];
+    collectState.currentBatch = 0;
+    collectState.totalAdded = 0;
+
+    for (let i = 0; i < tools.length; i += COLLECT_BATCH_SIZE) {
+      collectState.batches.push(tools.slice(i, i + COLLECT_BATCH_SIZE));
+    }
+
+    progress.textContent = `${tools.length}件取得完了 / ${collectState.batches.length}バッチに分割`;
+    badge.textContent = `0/${collectState.batches.length} 完了`;
+    toast('success', `${tools.length}件取得！プロンプトを表示します`);
+
+    // 最初のバッチのプロンプトを表示
+    showPromptModal();
+
+  } catch(e) {
+    toast('error', '取得失敗: ' + e.message);
+    resetCollectUI();
+  }
+}
+
+// ai-gallery.jp REST APIから全件取得
+async function fetchAllToolsFromSite() {
+  const base = 'https://ai-gallery.jp/wp-json/wp/v2/tools';
+  const perPage = 100;
+
+  // 総ページ数を取得
+  const firstRes = await fetch(`${base}?per_page=${perPage}&page=1&_fields=id`);
+  const totalPages = parseInt(firstRes.headers.get('X-WP-TotalPages') || '1');
+
+  // カテゴリ名マップを取得
+  const catMap = await fetchToolCategoryMap();
+
+  const allTools = [];
+  for (let page = 1; page <= totalPages; page++) {
+    const res = await fetch(
+      `${base}?per_page=${perPage}&page=${page}&_fields=id,title,link,tool-category,excerpt,modified_gmt,date_gmt`
+    );
+    if (!res.ok) continue;
+    const posts = await res.json();
+    for (const p of posts) {
+      const catIds = p['tool-category'] || [];
+      const catNames = catIds.map(id => catMap[id] || String(id)).join('、');
+      const excerpt = (p.excerpt?.rendered || '').replace(/<[^>]+>/g, '').trim().substring(0, 200);
+      const updated = (p.modified_gmt || p.date_gmt || '').substring(0, 10).replace(/-/g, '/');
+      allTools.push({
+        name    : (p.title?.rendered || '').trim(),
+        category: catNames,
+        excerpt : excerpt,
+        url     : p.link || '',
+        updated : updated,
+      });
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return allTools;
+}
+
+// tool-categoryのID→名前マップ取得
+async function fetchToolCategoryMap() {
+  const map = {};
+  try {
+    const res = await fetch('https://ai-gallery.jp/wp-json/wp/v2/tool-category?per_page=100&_fields=id,name');
+    if (res.ok) {
+      const terms = await res.json();
+      terms.forEach(t => { map[t.id] = t.name; });
+    }
+  } catch(e) { console.warn('カテゴリ取得失敗:', e); }
+  return map;
+}
+
+// ② プロンプトモーダルを表示
+function showPromptModal() {
+  const batchNo = collectState.currentBatch + 1;
+  const totalBatches = collectState.batches.length;
+  const batch = collectState.batches[collectState.currentBatch];
+
+  document.getElementById('prompt-batch-label').textContent = `バッチ ${batchNo}/${totalBatches}`;
+
+  const toolList = batch.map((t, i) =>
+    `${collectState.currentBatch * COLLECT_BATCH_SIZE + i + 1}. ${t.name}（${t.category}）`
+  ).join('\n');
+
+  const prompt = `以下の${batch.length}件のAIツールについて、各ツールの情報を調査してJSON配列形式のみで回答してください。
+
+${toolList}
+
+各ツールについて以下のフィールドを含むJSONオブジェクトを作成してください：
+- name: ツール名（上記のまま）
+- category: カテゴリ（上記のまま）
+- summary: 何ができるツールか2〜3文で日本語説明
+- features: 他ツールと差別化できる主な特徴1〜2文
+- free: 無料プランの有無（「あり」または「なし」）
+- rating: 知名度・使いやすさ・機能性を総合した1〜5の整数
+- usecase: 具体的な使用シナリオ1文
+
+必ずJSON配列のみを返してください。説明文・マークダウン記号（\`\`\`など）は不要です。`;
+
+  document.getElementById('prompt-text').value = prompt;
+  document.getElementById('paste-text').value = '';
+  document.getElementById('paste-status').textContent = '';
+
+  showModal('modal-prompt');
+}
+
+// プロンプトをコピー
+function copyPrompt() {
+  const text = document.getElementById('prompt-text').value;
+  navigator.clipboard.writeText(text).then(() => {
+    toast('success', 'プロンプトをコピーしました！Geminiに貼り付けてください');
+  });
+}
+
+// Geminiを開いて回答貼り付けモーダルへ
+function openGeminiAndWait() {
+  window.open('https://gemini.google.com', '_blank');
+  closeModal('modal-prompt');
+
+  // 少し待ってから回答貼り付けモーダルを表示
+  setTimeout(() => {
+    const batchNo = collectState.currentBatch + 1;
+    const totalBatches = collectState.batches.length;
+    document.getElementById('paste-batch-label').textContent = `バッチ ${batchNo}/${totalBatches}`;
+    showModal('modal-paste');
+  }, 500);
+}
+
+// ③ 回答をSheetsに保存して次のバッチへ
+async function saveBatchToSheets() {
+  const pasteText = document.getElementById('paste-text').value.trim();
+  if (!pasteText) {
+    toast('error', '回答を貼り付けてください');
+    return;
+  }
+
+  const gasUrl = getGasUrl();
+  if (!gasUrl) {
+    toast('error', 'GAS Web App URLを設定してください');
+    return;
+  }
+
+  const btn = document.getElementById('btn-save-batch');
+  btn.disabled = true;
+  btn.textContent = '⏳ 保存中...';
+  document.getElementById('paste-status').textContent = '解析中...';
+
+  try {
+    // Gemini回答をパース
+    const items = parseGeminiResponse(pasteText, collectState.batches[collectState.currentBatch]);
+
+    if (items.length === 0) {
+      toast('error', '回答の解析に失敗しました。Geminiの回答をそのまま貼り付けてください');
+      document.getElementById('paste-status').textContent = '❌ 解析失敗 — 回答をそのまま貼り付けてください';
+      btn.disabled = false;
+      btn.textContent = '📊 Sheetsに保存して次へ';
+      return;
+    }
+
+    document.getElementById('paste-status').textContent = `✅ ${items.length}件を解析 → Sheetsに保存中...`;
+
+    // GAS経由でSheetsに保存
+    const added = await saveItemsToGas(items, gasUrl);
+    collectState.totalAdded += added;
+
+    toast('success', `バッチ${collectState.currentBatch + 1}: ${added}件保存完了`);
+
+    // 進捗更新
+    collectState.currentBatch++;
+    const progress = document.getElementById('manual-collect-progress');
+    const badge = document.getElementById('manual-collect-badge');
+    progress.textContent = `${collectState.currentBatch}/${collectState.batches.length}バッチ完了 / 計${collectState.totalAdded}件保存`;
+    badge.textContent = `${collectState.currentBatch}/${collectState.batches.length} 完了`;
+
+    closeModal('modal-paste');
+
+    // 全バッチ完了チェック
+    if (collectState.currentBatch >= collectState.batches.length) {
+      document.getElementById('collect-done-count').textContent = collectState.totalAdded;
+      showModal('modal-collect-done');
+      badge.textContent = '✅ 完了';
+      badge.className = 'schedule-badge badge-on';
+      resetCollectUI();
+    } else {
+      // 次のバッチのプロンプトを表示
+      setTimeout(showPromptModal, 300);
+    }
+
+  } catch(e) {
+    toast('error', '保存失敗: ' + e.message);
+    document.getElementById('paste-status').textContent = '❌ 保存失敗: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📊 Sheetsに保存して次へ';
+  }
+}
+
+// Gemini回答をパース
+function parseGeminiResponse(text, batch) {
+  // コードブロック記号を除去
+  text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+  // JSON配列を抽出
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) {
+    // フォールバック：バッチのツール名をそのまま使用
+    return batch.map(t => ({
+      name    : t.name,
+      category: t.category,
+      summary : t.excerpt || '',
+      features: '',
+      free    : '不明',
+      rating  : 3,
+      usecase : '',
+      url     : t.url,
+      updated : t.updated,
+    }));
+  }
+
+  try {
+    const items = JSON.parse(match[0]);
+    // URLをバッチデータから補完
+    return items.map((item, i) => {
+      const original = batch[i] || {};
+      return {
+        name    : item.name     || original.name || '',
+        category: item.category || original.category || '',
+        summary : item.summary  || original.excerpt || '',
+        features: item.features || '',
+        free    : item.free     || '不明',
+        rating  : parseInt(item.rating) || 3,
+        usecase : item.usecase  || '',
+        url     : original.url  || '',
+        updated : original.updated || new Date().toISOString().substring(0, 10).replace(/-/g, '/'),
+      };
+    });
+  } catch(e) {
+    console.error('JSONパースエラー:', e);
+    return [];
+  }
+}
+
+// GAS経由でSheetsに保存
+async function saveItemsToGas(items, gasUrl) {
+  const today = new Date().toISOString().substring(0, 10).replace(/-/g, '/');
+  let added = 0;
+
+  // 10件ずつGASに送信（GETパラメーターの長さ制限対策）
+  const chunkSize = 10;
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    const rows = chunk.map((item, idx) => {
+      const rating = '★'.repeat(Math.min(5, Math.max(1, item.rating)));
+      return [
+        '',  // No（GAS側で採番）
+        item.name,
+        item.category,
+        item.summary,
+        item.features,
+        item.free,
+        rating,
+        item.usecase,
+        item.url,
+        item.updated || today,
+      ].join('||');
+    });
+
+    const params = new URLSearchParams({
+      action: 'appendRows',
+      rows: rows.join('$$'),
+    });
+
+    const res = await fetch(`${gasUrl}?${params}`);
+    const data = await res.json();
+    if (data.ok) added += data.added || chunk.length;
+
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return added;
+}
+
+// 収集キャンセル
+function cancelCollect() {
+  resetCollectUI();
+}
+
+function resetCollectUI() {
+  const btn = document.getElementById('btn-manual-collect');
+  btn.disabled = false;
+  btn.textContent = '🚀 収集を開始する';
+}
+
+// ============================================================
 //  ⏰ スケジュール管理（GAS連携）
 // ============================================================
 
@@ -1842,5 +2185,72 @@ document.getElementById('input-gas-url').addEventListener('input', () => {
   localStorage.setItem('ai-mgr-cfg', JSON.stringify(cfg));
 });
 </script>
+<!-- ============================================================ -->
+<!-- 🤖 Gemini手動収集 モーダル①：プロンプト表示 -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="modal-prompt">
+  <div class="modal" style="max-width:700px;width:95vw">
+    <div class="modal-title">
+      📋 Geminiにプロンプトを貼り付けてください
+      <span id="prompt-batch-label" style="font-size:11px;color:var(--accent);margin-left:8px;font-family:'Space Mono',monospace"></span>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">
+        以下のプロンプトをコピーして <strong style="color:var(--accent)">gemini.google.com</strong> に貼り付け、実行してください。<br>
+        回答が出たら「次へ」を押してください。
+      </p>
+      <textarea id="prompt-text" readonly
+        style="width:100%;height:280px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;color:var(--text-dim);font-family:'Space Mono',monospace;resize:vertical;line-height:1.6"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-prompt');cancelCollect()">キャンセル</button>
+      <button class="btn btn-primary" onclick="copyPrompt()">📋 プロンプトをコピー</button>
+      <button class="btn btn-success" onclick="openGeminiAndWait()">✅ コピーしました → Geminiを開く</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 🤖 Gemini手動収集 モーダル②：回答貼り付け -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="modal-paste">
+  <div class="modal" style="max-width:700px;width:95vw">
+    <div class="modal-title">
+      📥 Geminiの回答を貼り付けてください
+      <span id="paste-batch-label" style="font-size:11px;color:var(--accent);margin-left:8px;font-family:'Space Mono',monospace"></span>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">
+        Geminiの回答を全てコピーして、以下の入力欄に貼り付けてください。
+      </p>
+      <textarea id="paste-text" placeholder="Geminiの回答をここに貼り付けてください..."
+        style="width:100%;height:280px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;color:var(--text);font-family:'Space Mono',monospace;resize:vertical;line-height:1.6"></textarea>
+      <div id="paste-status" style="font-size:11px;color:var(--text-muted);margin-top:8px"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-paste');cancelCollect()">キャンセル</button>
+      <button class="btn btn-warn" id="btn-save-batch" onclick="saveBatchToSheets()">📊 Sheetsに保存して次へ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 🤖 Gemini手動収集 完了モーダル -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="modal-collect-done">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">🎉 全件収集完了！</div>
+    <div class="modal-body">
+      <p style="text-align:center;font-size:14px;margin:16px 0">
+        <span id="collect-done-count" style="font-size:28px;font-weight:900;color:var(--accent)">0</span>
+        <span style="color:var(--text-dim)"> 件をSheetsに保存しました</span>
+      </p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('modal-collect-done')">閉じる</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
